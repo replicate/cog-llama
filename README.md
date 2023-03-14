@@ -52,8 +52,16 @@ weights/tokenizer
 You can run the model locally to test it:
 
 ```
-cog predict -i prompt="A llama is"
+cog predict -i prompt="Simply put, the theory of relativity states that"
 ```
+
+LLaMA is not fine-tuned to answer questions. You should construct your prompt so that the expected answer is the natural continuation of your prompt. 
+
+Here are a few examples from the [LLaMA FAQ](https://github.com/facebookresearch/llama/blob/57b0eb62de0636e75af471e49e2f1862d908d9d8/FAQ.md#2-generations-are-bad):
+
+- Do not prompt with "What is the meaning of life? Be concise and do not repeat yourself." but with "I believe the meaning of life is"
+- Do not prompt with "Explain the theory of relativity." but with "Simply put, the theory of relativity states that"
+- Do not prompt with "Ten easy steps to build a website..." but with "Building a website can be done in 10 simple steps:\n"
 
 ## Step 3: Create a model on Replicate
 
