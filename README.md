@@ -17,7 +17,9 @@ You can run the model locally to test it:
 
     cog predict -i prompt="How do you play the accordion?"
 
-Log in to Replicate:
+First, go to [replicate.com/create](https://replicate.com/create) to create a Replicate model, making sure to specify "private" if you want to keep it private.
+
+Then, log in to Replicate:
 
     cog login
 
