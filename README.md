@@ -16,7 +16,7 @@ This model can be used to run the `7B` version of LLaMA and it also works with f
 - **GPU machine**. You'll need a Linux machine with an NVIDIA GPU attached and the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#docker) installed. If you don't already have access to a machine with a GPU, check out our [guide to getting a GPU machine](https://replicate.com/docs/guides/get-a-gpu-machine).
 - **Docker**. You'll be using the [Cog](https://github.com/replicate/cog) command-line tool to build and push a model. Cog uses Docker to create containers for models.
 
-## Step 1: Install Cog
+## Step 0: Install Cog
 
 First, [install Cog](https://github.com/replicate/cog#install):
 
