@@ -6,7 +6,6 @@ If you have LLaMA weights, here's how to convert them. Make sure to specify mode
 
     python /root/.pyenv/versions/3.10.10/lib/python3.10/site-packages/transformers/models/llama/convert_llama_weights_to_hf.py --input_dir /src/llamas/ --model_size 7B --output_dir weights_conv
 
+If your weights are already converted, great! Just place them in `weights_conv`.Then you can generate text based on input prompts:
 
-Then you can generate text based on input prompts:
-
-    cog predict -i prompt="Q: Answer the following yes/no question by reasoning step-by-step. Can a dog drive a car?"
+    cog predict -i prompt="How do you play the accordion?"
