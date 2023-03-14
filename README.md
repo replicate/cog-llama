@@ -1,6 +1,6 @@
-# LLaMA Cog model
+# LLaMA Cog template
 
-This is an implementation of LLaMA as a Cog model. [Cog packages machine learning models as standard containers.](https://github.com/replicate/cog)
+This is a template to run LLaMA in [Cog](https://github.com/replicate/cog).
 
 Put your weights in a folder `weights_conv/`.
 
