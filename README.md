@@ -1,6 +1,6 @@
 # LLaMA Cog template
 
-This is a template to run LLaMA in [Cog](https://github.com/replicate/cog).
+A template to run LLaMA in [Cog](https://github.com/replicate/cog).
 
 Put your weights in a folder `weights_conv/`.
 
