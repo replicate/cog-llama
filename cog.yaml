@@ -10,6 +10,6 @@ build:
     - "accelerate==0.16.0"
   
   run:
-    - "pip install git+https://github.com/huggingface/transformers.git@c3dc391da81e6ed7efce42be06413725943b3920"
+    - "pip install git+https://github.com/huggingface/transformers.git@ef61b1ba1a8ee9fd354b640b059c3474b676c0c5"
 
 predict: "predict.py:Predictor"
