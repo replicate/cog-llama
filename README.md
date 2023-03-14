@@ -1,4 +1,4 @@
-# LLaMA Cog template
+# LLaMA Cog template 🦙
 
 A template to run LLaMA in [Cog](https://github.com/replicate/cog) with Transformers.
 
