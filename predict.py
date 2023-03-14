@@ -1,21 +1,29 @@
 from typing import List, Optional
 from cog import BasePredictor, Input
-from transformers import T5ForConditionalGeneration, T5Tokenizer
+from transformers import LLaMAForCausalLM, LLaMATokenizer
 import torch
 
 CACHE_DIR = 'weights'
 SEP = "<sep>"
 
+# ```python
+# >>> from transformers import AutoTokenizer, LLaMAForCausalLM
+# >>> model = LLaMAForCausalLM.from_pretrained(PATH_TO_CONVERTED_WEIGHTS)
+# >>> tokenizer = AutoTokenizer.from_pretrained(PATH_TO_CONVERTED_TOKENIZER)
+# >>> prompt = "Hey, are you consciours? Can you talk to me?"
+# >>> inputs = tokenizer(prompt, return_tensors="pt")
+
 class Predictor(BasePredictor):
     def setup(self):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        self.model = T5ForConditionalGeneration.from_pretrained("google/flan-t5-xl", cache_dir=CACHE_DIR, local_files_only=True)
+        self.model = LLaMAForCausalLM.from_pretrained("weights_conv/llama-7b", cache_dir=CACHE_DIR, local_files_only=True)
+        self.model = self.model
         self.model.to(self.device)
-        self.tokenizer = T5Tokenizer.from_pretrained("google/flan-t5-xl", cache_dir=CACHE_DIR, local_files_only=True)
+        self.tokenizer = LLaMATokenizer.from_pretrained("weights_conv/tokenizer", cache_dir=CACHE_DIR, local_files_only=True)
 
     def predict(
         self,
-        prompt: str = Input(description=f"Prompt to send to FLAN-T5."),
+        prompt: str = Input(description=f"Prompt to send to LLaMA."),
         n: int = Input(description="Number of output sequences to generate", default=1, ge=1, le=5),
         max_length: int = Input(
             description="Maximum number of tokens to generate. A word is generally 2-3 tokens",

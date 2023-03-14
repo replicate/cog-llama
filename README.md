@@ -1,10 +1,10 @@
 # FLAN-T5 Cog model
 
-This is an implementation of [FLAN-T5](https://huggingface.co/docs/transformers/model_doc/flan-t5) as a Cog model. [Cog packages machine learning models as standard containers.](https://github.com/replicate/cog)
+This is an implementation of [LLaMA] as a Cog model. [Cog packages machine learning models as standard containers.](https://github.com/replicate/cog)
 
-First, download the pre-trained weights:
+If you have LLaMA weights, here's how to convert them. Make sure to specify model_size properly.
+    python /root/.pyenv/versions/3.10.10/lib/python3.10/site-packages/transformers/models/llama/convert_llama_weights_to_hf.py --input_dir /src/llamas/ --model_size 7B --output_dir weights_conv
 
-    cog run script/download-weights 
 
 Then you can generate text based on input prompts:
 
