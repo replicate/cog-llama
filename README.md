@@ -29,10 +29,17 @@ sudo chmod +x /usr/local/bin/cog
 
 Replicate currently supports the `7B` model size.
 
-Put your downloaded weights in a folder called `unconverted-weights`. It should have these sub-folders:
+Put your downloaded weights in a folder called `unconverted-weights`. The folder hierarchy should look something like this: 
 
-* `unconverted-weights/llama-7b/` – checkpoints
-* `unconverted-weights/tokenizer/` – tokenizer
+```
+unconverted-weights
+├── 7B
+│   ├── checklist.chk
+│   ├── consolidated.00.pth
+│   └── params.json
+├── tokenizer.model
+└── tokenizer_checklist.chk
+```
 
 Convert the weights from a PyTorch checkpoint to a transformers-compatible format using the this command:
 
@@ -46,6 +53,8 @@ You final directory structure should look like this:
 weights/llama-7b
 weights/tokenizer
 ```
+
+Once you've done this, you should uncomment `unconverted-weights` in your `.dockerignore` file so that the `unconverted-weights` aren't built into the resulting cog image. 
 
 ## Step 2: Run the model
 
