@@ -50,11 +50,18 @@ cog run python -m transformers.models.llama.convert_llama_weights_to_hf --input_
 You final directory structure should look like this:
 
 ```
-weights/llama-7b
-weights/tokenizer
+weights
+├── config.json
+├── generation_config.json
+├── pytorch_model-00001-of-00002.bin
+├── pytorch_model-00002-of-00002.bin
+├── pytorch_model.bin.index.json
+├── special_tokens_map.json
+├── tokenizer.model
+└── tokenizer_config.json
 ```
 
-Once you've done this, you should uncomment `unconverted-weights` in your `.dockerignore` file so that the `unconverted-weights` aren't built into the resulting cog image. 
+Once you've done this, you should uncomment `unconverted-weights` in your `.dockerignore` file. This ensures that `unconverted-weights` aren't built into the resulting cog image.
 
 ## Step 2: Run the model
 

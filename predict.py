@@ -1,19 +1,18 @@
 from typing import List, Optional
 from cog import BasePredictor, Input
-from transformers import LLaMAForCausalLM, LLaMATokenizer
+from transformers import LlamaForCausalLM, LlamaTokenizer
 import torch
 
 CACHE_DIR = 'weights'
-SEP = "<sep>"
 
 
 class Predictor(BasePredictor):
     def setup(self):
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        self.model = LLaMAForCausalLM.from_pretrained("weights/llama-7b", cache_dir=CACHE_DIR, local_files_only=True)
+        self.model = LlamaForCausalLM.from_pretrained("weights", cache_dir=CACHE_DIR, local_files_only=True)
         self.model = self.model
         self.model.to(self.device)
-        self.tokenizer = LLaMATokenizer.from_pretrained("weights/tokenizer", cache_dir=CACHE_DIR, local_files_only=True)
+        self.tokenizer = LlamaTokenizer.from_pretrained("weights", cache_dir=CACHE_DIR, local_files_only=True)
 
     def predict(
         self,
