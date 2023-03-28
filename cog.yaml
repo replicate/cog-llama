@@ -16,6 +16,7 @@ build:
     - "transformers"
     - "accelerate"
     - "peft"
+    - "sentencepiece"
 
 # predict.py defines how predictions are run on your model
 predict: "predict.py:Predictor"

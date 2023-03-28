@@ -5,6 +5,7 @@ import argparse
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 from peft import PeftModel
 from torch.utils.data import Dataset
+import torch
 from transformers import Trainer, TrainingArguments
 
 # Would be good to add some sort of "tuner" entity here s.t. we're not just running 
@@ -33,26 +34,21 @@ class Preprocessor:
 
     def batch_tokenize(self, texts, labels=False):
         """Tokenizes text. Presently pads all inputs to length of longest sequence."""
-        # TODO: experiment with padding strategies
-        lens = [self.tokenizer(tokens).input_ids for tokens in texts]
-        max_len = max(lens)
-
         tokenized = [
             self.tokenizer(
                 prompt, 
                 return_tensors='pt',
-                padding='max_length',
-                max_length=max_len,
-                )
+                padding='longest',
+                ).input_ids
             for prompt in texts
         ]
-        if labels:
-            tokenized = [val.input_ids for val in tokenized]
+        # if labels:
+        #     tokenized = [val.input_ids for val in tokenized]
 
-            # change pad token id to -100 in labels s.t. loss function ignores it. 
-            def _ignore_pad(sequence):
-                sequence[sequence == self.tokenizer.pad_token_id] = -100
-            _ = map(_ignore_pad, tokenized)
+        #     # # change pad token id to -100 in labels s.t. loss function ignores it. 
+        #     # def _ignore_pad(sequence):
+        #     #     sequence[sequence == self.tokenizer.pad_token_id] = -100
+        #     # _ = map(_ignore_pad, tokenized)
         return tokenized
 
     def make_prompt(self, input_row):
@@ -62,8 +58,8 @@ class Preprocessor:
     
     def construct_dataset(self, input_data):
         prompts = [self.make_prompt(val) for val in input_data]
-        tokenized_input_ids = self.batch_tokenize(prompts)
-        labels = [val['label'] for val in input_data]
+        tokenized_input_ids = self.batch_tokenize(prompts) 
+        labels = [val['output'] for val in input_data]
         tokenized_labels = self.batch_tokenize(labels, labels=True)
         return TuneDataset(tokenized_input_ids, tokenized_labels)
 
@@ -79,6 +75,27 @@ class TuneDataset(Dataset):
 
     def __getitem__(self, i):
         return dict(input_ids=self.input_ids[i], labels=self.labels[i])
+    
+
+class DataCollatorForSupervisedDataset(object):
+    """Collate examples for supervised fine-tuning."""
+
+    def __init__(self, tokenizer):
+
+        self.tokenizer = tokenizer
+
+    def __call__(self, instances):
+        input_ids, labels = tuple([instance[key][0] for instance in instances] for key in ("input_ids", "labels"))
+        #pdb.set_trace()
+        input_ids = torch.nn.utils.rnn.pad_sequence(
+            input_ids, batch_first=True, padding_value=self.tokenizer.pad_token_id
+        )
+        labels = torch.nn.utils.rnn.pad_sequence(labels, batch_first=True, padding_value=-100)
+        return dict(
+            input_ids=input_ids,
+            labels=labels,
+            attention_mask=input_ids.ne(self.tokenizer.pad_token_id),
+        )
         
 
 
@@ -90,8 +107,8 @@ def load_json(path):
     
 
 def load_model(model_name_or_path):
-    model = T5ForConditionalGeneration.from_pretrained(model_name_or_path)
-    tokenizer = T5Tokenizer.from_pretrained(model_name_or_path)
+    model = T5ForConditionalGeneration.from_pretrained(model_name_or_path, cache_dir="pretrained_weights")
+    tokenizer = T5Tokenizer.from_pretrained(model_name_or_path, cache_dir="pretrained_weights")
     return model, tokenizer
 
 
@@ -102,54 +119,42 @@ def train(args):
     dataset = load_json(args.data_path)
     p = Preprocessor(tokenizer)
     train_data = p.construct_dataset(dataset)
-
-    # TODO: if this is long AF then you can just write a dataCollator
+    print('training')
+    print(train_data[0])
     trainer = Trainer(
         model=model,
-        train_dataset=dataset,
+        train_dataset=train_data,
         eval_dataset=None,
         args = TrainingArguments(
-            bf16=True,
-            output_dir='flan-t5-out'
-            per_device_train_batch_size=4, 
-            per_device_eval_batch_size=4
+            tf32=True,
+            output_dir=args.output_path,
+            per_device_train_batch_size=args.batch_size, 
+            per_device_eval_batch_size=4,
             gradient_accumulation_steps=8,
-            save_strategy='epoch'
+            save_strategy='epoch',
             save_total_limit=3,
             logging_steps=1,
             lr_scheduler_type='cosine',
-            warmup_steps=100,
-            num_train_epochs=EPOCHS,
-            learning_rate=LEARNING_RATE,
-            fp16=True,
-            logging_steps=20,
-            evaluation_strategy="steps" if VAL_SET_SIZE > 0 else "no",
-            )
-        data_collator=
+            warmup_ratio=args.warmup_ratio,
+            num_train_epochs=args.epochs,
+            learning_rate=args.learning_rate,
+            fsdp='full_shard'
+            ),
+        data_collator=DataCollatorForSupervisedDataset(tokenizer),
     )
+    trainer.train()
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Fine-tune a language model on a text dataset")
 
     parser.add_argument("--data_path", type=str, required=True, help="Path to the text dataset")
-    parser.add_argument("--model_class", type=str, required=True, help="The model class to fine-tune on HF or as a local path (e.g. 'google/flan-t5-xxl'")
+    parser.add_argument("--model_name_or_path", type=str, required=True, help="The model class to fine-tune on HF or as a local path (e.g. 'google/flan-t5-xxl'")
+    parser.add_argument("--output_path", type=str, required=True, help="Output path on disk to store your model")
     parser.add_argument("--epochs", type=int, required=True, help="Number of training epochs")
-    parser.add_argument("--learning_rate", type=float, required=True, help="Learning rate for the optimizer")
-
-    parser.add_argument("--batch_size", type=int, default=8, help="Batch size for training")
-    parser.add_argument("--max_seq_length", type=int, default=512, help="Maximum sequence length for tokenized text")
-    parser.add_argument("--warmup_steps", type=int, default=0, help="Number of warmup steps for the learning rate scheduler")
+    parser.add_argument("--learning_rate", type=float, default=2e-5, help="Learning rate for the optimizer")
+    parser.add_argument("--batch_size", type=int, default=4, help="Batch size for training")
+    parser.add_argument("--warmup_ratio", type=float, default=0.03, help="Number of warmup steps for the learning rate scheduler")
 
     args = parser.parse_args()
     train(args)
-
-
-# ok, so how do I pad these tokens? I need to go through and compute 
-
-# so ignore index = pad token, but nothing else. 
-# also yeah the alpaca code is set up for weird llama particulars
-# this code, right here, is still useful if it only fine-tunes flan-t5 and you fully understand it. 
-# so keep it scoped to that. 
-
-# need to add attention_mask as well. 
