@@ -10,9 +10,9 @@ from transformers.generation.logits_process import  LogitsProcessorList
 from transformers.generation.stopping_criteria import StoppingCriteriaList, validate_stopping_criteria
 from transformers.generation.utils import SampleOutput, SampleDecoderOnlyOutput, SampleEncoderDecoderOutput
 
-from transformers import LLaMAForCausalLM
+from transformers import LlamaForCausalLM
 
-class YieldingLlama(LLaMAForCausalLM):
+class YieldingLlama(LlamaForCausalLM):
     """Overriding sample to yield tokens"""
     def sample(
             self,

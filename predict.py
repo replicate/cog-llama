@@ -1,6 +1,6 @@
 from typing import List, Optional
 from cog import BasePredictor, Input, ConcatenateIterator
-from transformers import LLaMATokenizer
+from transformers import LlamaTokenizer
 from typing import Any
 import torch
 
@@ -14,7 +14,7 @@ class Predictor(BasePredictor):
         self.model = YieldingLlama.from_pretrained("weights/llama-7b", cache_dir=CACHE_DIR, local_files_only=True)
         self.model.eval()
         self.model.to(self.device)
-        self.tokenizer = LlamaTokenizer.from_pretrained("weights", cache_dir=CACHE_DIR, local_files_only=True)
+        self.tokenizer = LlamaTokenizer.from_pretrained("weights/tokenizer", cache_dir=CACHE_DIR, local_files_only=True)
 
     def predict(
         self,
@@ -56,12 +56,10 @@ class Predictor(BasePredictor):
                 repetition_penalty=repetition_penalty,
             ):
                 cur_id = output.item()
-                print(f'token_id: {cur_id}')
 
                 # in order to properly handle spaces, we need to do our own tokenizing. Fun! 
                 # we're building up a buffer of sub-word / punctuation tokens until we hit a space, and then yielding whole words + punctuation.
                 cur_token = self.tokenizer.convert_ids_to_tokens(cur_id)
-                print(f"token: {cur_token}")
                 
                 # skip initial newline, which this almost always yields. hack - newline id = 13. 
                 if not first_token_yielded and not prev_ids and cur_id == 13:
@@ -69,7 +67,6 @@ class Predictor(BasePredictor):
                 
                 # underscore means a space, means we yield previous tokens
                 if cur_token.startswith('▁'): # this is not a standard underscore. 
-                    print(f"{cur_token} starts with '_'")
                     # first token
                     if not prev_ids:
                         prev_ids = [cur_id]
@@ -84,10 +81,8 @@ class Predictor(BasePredictor):
                             # no leading space for first token
                             token = token.strip()
                             first_token_yielded = True
-                        print(f'yielding {token}')
                         yield token
                 else:
-                    print(f"{cur_token} not starts with '_'")
                     prev_ids.append(cur_id)
                     continue
 
