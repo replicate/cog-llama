@@ -1,19 +1,40 @@
 from typing import List
+from collections import OrderedDict
 from cog import BasePredictor, Input
-from transformers import T5ForConditionalGeneration, T5Tokenizer
-from train import resolve_model
+from transformers import T5ForConditionalGeneration, T5Tokenizer, AutoConfig, AutoModelForSeq2SeqLM
+from train import resolve_model, load_tokenizer, MODEL_NAME
 import torch
-
+from tensorizer import TensorDeserializer
+from tensorizer.utils import no_init_or_tensor
+# two things we need - configuration of model & configuration/actual tokenizer
+# in train, we...right now load configuration of model and model from the container
+# tokenizer doesn't change, just need to disambiguate model_name from tensorizer.
 
 class Predictor(BasePredictor):
-    def setup(self, weights=None):
+    def setup(self, weights='tuned_weights.tensorized'):
         model_name = resolve_model(weights)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.model = T5ForConditionalGeneration.from_pretrained(
-            model_name, cache_dir='pretrained_weights', torch_dtype=torch.float16, local_files_only=True
+
+        if 'tensorized' in weights: #TODO: this is not the best way to determine whether something is or is not tensorized.
+            self.model = self.load_tensorizer(weights)
+        else:
+            self.model = T5ForConditionalGeneration.from_pretrained(
+                model_name, cache_dir='pretrained_weights', torch_dtype=torch.float16, local_files_only=True
+            )
+            self.model.to(self.device)
+        self.tokenizer = load_tokenizer()
+
+    def load_tensorizer(self, weights):
+        config = AutoConfig.from_pretrained(MODEL_NAME)
+
+        model = no_init_or_tensor(
+            lambda: AutoModelForSeq2SeqLM.from_pretrained(
+                None, config=config, state_dict=OrderedDict()
+            )
         )
-        self.model.to(self.device)
-        self.tokenizer = T5Tokenizer.from_pretrained(model_name)
+        des = TensorDeserializer(weights, plaid_mode=True)
+        des.load_into_module(model)
+        self.model = model
 
     def predict(
         self,

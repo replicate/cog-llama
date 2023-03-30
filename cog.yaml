@@ -17,6 +17,7 @@ build:
     - "accelerate"
     - "peft"
     - "sentencepiece"
+    - "tensorizer"
 
 # predict.py defines how predictions are run on your model
 predict: "predict.py:Predictor"

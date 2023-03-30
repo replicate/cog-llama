@@ -8,11 +8,11 @@ from transformers import T5ForConditionalGeneration, T5Tokenizer
 from torch.utils.data import Dataset
 import torch
 from transformers import Trainer, TrainingArguments
-from pathlib import Path
-from cog import Input
+from cog import Input, BaseModel, Path, File
+from tensorizer import TensorSerializer
 
 MODEL_NAME = "google/flan-t5-base" # this is a hack
-MODEL_OUT_PATH = "tuned_weights"
+MODEL_OUT = "tuned_weights.tensorized"
 CHECKPOINT_DIR = "checkpoints"
 SAVE_STRATEGY = "epoch"
 
@@ -21,8 +21,8 @@ def reset_dir(directory):
         shutil.rmtree(directory)
     os.makedirs(directory)
 
-def get_model(weights):
-    if 
+class TrainingOutput(BaseModel):
+    weights: File
 
 class DatasetBuilder:
     """Dataset agnostic class to take in input_ids and labels and spit out tokens"""
@@ -101,15 +101,19 @@ def resolve_model(model_name_or_path):
 
 
 def load_model(model_name_or_path):
-    # TODO: tensorizer
+    # TODO: training from tensorizer
     model_name_or_path = resolve_model(model_name_or_path)
     model = T5ForConditionalGeneration.from_pretrained(
         model_name_or_path, cache_dir="pretrained_weights"
     )
-    tokenizer = T5Tokenizer.from_pretrained(
-        model_name_or_path, cache_dir="pretrained_weights"
+
+    return model, 
+
+def load_tokenizer():
+    """Same tokenizer, agnostic from tensorized weights/etc"""
+    return T5Tokenizer.from_pretrained(
+        MODEL_NAME, cache_dir="pretrained_weights"
     )
-    return model, tokenizer
 
 
 # TODO: eval
@@ -127,9 +131,10 @@ def train(
     #extra_args: dict = {},
 ) -> Path:  
     reset_dir(CHECKPOINT_DIR)
-    reset_dir(MODEL_OUT_PATH)
+    reset_dir(MODEL_OUT)
     print("loading model")
-    model, tokenizer = load_model(model_weights)
+    model = load_model(model_weights)
+    tokenizer = load_tokenizer()
     print("loading dataset")
     print(data_path)
     dataset = load_json(data_path)
@@ -158,9 +163,13 @@ def train(
     )
     trainer.train()
     # tensorize!
-    trainer.save_model(MODEL_OUT_PATH)
+    model = trainer.model
+    serializer = TensorSerializer(MODEL_OUT)
+    serializer.write_module(model)
+    serializer.close()
+    #trainer.save_model(MODEL_OUT_PATH)
 
-    return Path(MODEL_OUT_PATH)
+    return TrainingOutput(weights=MODEL_OUT)
 
 
 if __name__ == "__main__":
