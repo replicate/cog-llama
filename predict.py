@@ -1,22 +1,20 @@
-from typing import List, Optional
+from typing import List
 from cog import BasePredictor, Input
 from transformers import T5ForConditionalGeneration, T5Tokenizer
-from train import MODEL_OUT_PATH, TOKENIZER_NAME
-from process_data import PROMPT_DICT
+from train import MODEL_OUT_PATH, MODEL_NAME
 import torch
 
-MODEL_NAME = MODEL_OUT_PATH
-PROMPT = PROMPT_DICT['prompt_no_input']
-
+# TODO - this will fail 
+FINE_TUNED_NAME = MODEL_OUT_PATH
 
 class Predictor(BasePredictor):
     def setup(self):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = T5ForConditionalGeneration.from_pretrained(
-            MODEL_NAME, torch_dtype=torch.float16, local_files_only=True
+            MODEL_NAME, cache_dir='pretrained_weights', torch_dtype=torch.float16, local_files_only=True
         )
         self.model.to(self.device)
-        self.tokenizer = T5Tokenizer.from_pretrained(TOKENIZER_NAME)
+        self.tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME)
 
     def predict(
         self,
@@ -47,8 +45,11 @@ class Predictor(BasePredictor):
             le=5,
             default=1,
         ),
+        debug : bool = Input(
+            description="provide debugging output in logs",
+            default=False
+        )
     ) -> List[str]:
-        input = PROMPT.format_map({'instruction': prompt})
         input = self.tokenizer(prompt, return_tensors="pt").input_ids.to(self.device)
 
         outputs = self.model.generate(
@@ -60,9 +61,10 @@ class Predictor(BasePredictor):
             top_p=top_p,
             repetition_penalty=repetition_penalty,
         )
-        print(f"cur memory: {torch.cuda.memory_allocated()}")
-        print(f"max allocated: {torch.cuda.max_memory_allocated()}")
-        print(f"peak memory: {torch.cuda.max_memory_reserved()}")
+        if debug:
+            print(f"cur memory: {torch.cuda.memory_allocated()}")
+            print(f"max allocated: {torch.cuda.max_memory_allocated()}")
+            print(f"peak memory: {torch.cuda.max_memory_reserved()}")
         out = self.tokenizer.batch_decode(outputs, skip_special_tokens=True)
         return out
 

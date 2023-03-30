@@ -8,8 +8,9 @@ from transformers import T5ForConditionalGeneration, T5Tokenizer
 from torch.utils.data import Dataset
 import torch
 from transformers import Trainer, TrainingArguments
+from pathlib import Path
 
-TOKENIZER_NAME = "google/flan-t5-base" # this is a hack
+MODEL_NAME = "google/flan-t5-base" # this is a hack
 MODEL_OUT_PATH = "tuned_weights"
 CHECKPOINT_DIR = "checkpoints"
 SAVE_STRATEGY = "epoch"
@@ -39,7 +40,7 @@ class DatasetBuilder:
         return tokenized
 
     def construct_dataset(self, input_data):
-        prompts = [val['input_text'] for val in input_data]
+        prompts = [val['prompt'] for val in input_data]
         tokenized_input_ids = self.batch_tokenize(prompts)
         labels = [val["output"] for val in input_data]
         tokenized_labels = self.batch_tokenize(labels)
@@ -91,11 +92,9 @@ def load_json(path):
     return data
 
 
-def load_json_string(data):
-    return json.loads(data)
-
-
 def load_model(model_name_or_path):
+    if model_name_or_path is None:
+        model_name_or_path = MODEL_NAME
     model = T5ForConditionalGeneration.from_pretrained(
         model_name_or_path, cache_dir="pretrained_weights"
     )
@@ -107,8 +106,8 @@ def load_model(model_name_or_path):
 
 # todo - eval stuff
 def train(
-    model_name_or_path=str,
-    data=str,
+    data_path: Path,
+    model_name_or_path: str = None,
     train_batch_size: int = 8,
     gradient_accumulation_steps: int = 8,
     lr_scheduler_type: str = "cosine",
@@ -123,7 +122,8 @@ def train(
     print("loading model")
     model, tokenizer = load_model(model_name_or_path)
     print("loading dataset")
-    dataset = load_json_string(data)
+    print(data_path)
+    dataset = load_json(data_path)
     p = DatasetBuilder(tokenizer)
     train_data = p.construct_dataset(dataset)
     print("training")
@@ -157,12 +157,12 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--data_path", type=str, required=True, help="Path to the text dataset"
+        "--data_path", type=Path, required=True, help="Path to the json dataset"
     )
     parser.add_argument(
         "--model_name_or_path",
         type=str,
-        required=True,
+        default=None,
         help="The model class to fine-tune on HF or as a local path (e.g. 'google/flan-t5-xxl'",
     )
     parser.add_argument(
@@ -190,8 +190,5 @@ if __name__ == "__main__":
         help="Number of training steps to run, overrides num_train_epochs, useful for testing",
     )
 
-    args = vars(parser.parse_args())
-    # hack hack hack
-    data = load_json(args.pop("data_path"))
-    data = json.dumps(data)
-    train(data=data, **args)
+    some_args = parser.parse_args()
+    train(**vars(some_args))
