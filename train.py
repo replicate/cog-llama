@@ -9,6 +9,7 @@ from torch.utils.data import Dataset
 import torch
 from transformers import Trainer, TrainingArguments
 from pathlib import Path
+from cog import Input
 
 MODEL_NAME = "google/flan-t5-base" # this is a hack
 MODEL_OUT_PATH = "tuned_weights"
@@ -20,6 +21,8 @@ def reset_dir(directory):
         shutil.rmtree(directory)
     os.makedirs(directory)
 
+def get_model(weights):
+    if 
 
 class DatasetBuilder:
     """Dataset agnostic class to take in input_ids and labels and spit out tokens"""
@@ -91,10 +94,15 @@ def load_json(path):
         data = json.load(f)
     return data
 
+def resolve_model(model_name_or_path):
+    if model_name_or_path is None:
+        return MODEL_NAME
+    return model_name_or_path
+
 
 def load_model(model_name_or_path):
-    if model_name_or_path is None:
-        model_name_or_path = MODEL_NAME
+    # TODO: tensorizer
+    model_name_or_path = resolve_model(model_name_or_path)
     model = T5ForConditionalGeneration.from_pretrained(
         model_name_or_path, cache_dir="pretrained_weights"
     )
@@ -104,23 +112,24 @@ def load_model(model_name_or_path):
     return model, tokenizer
 
 
-# todo - eval stuff
+# TODO: eval
 def train(
-    data_path: Path,
-    model_name_or_path: str = None,
-    train_batch_size: int = 8,
-    gradient_accumulation_steps: int = 8,
-    lr_scheduler_type: str = "cosine",
-    learning_rate: float = 2e-4,
-    warmup_ratio: float = 0.03,
-    num_train_epochs: int = 1,
-    logging_steps: int = 1,
-    **kwargs
-):  
+    data_path: Path = Input(description="path to data file to use for fine-tuning your model"),
+    model_weights: Path = Input(description="location of weights that are going to be fine-tuned", default=None),
+    train_batch_size: int = Input(description="batch size per GPU", default=8, ge=1),
+    gradient_accumulation_steps: int = Input(description="number of training steps to update gradient for before performing a backward pass", default=8),
+    lr_scheduler_type: str = Input(description="learning rate scheduler", default="cosine", choices=["linear", "cosine", 'cosine_with_restarts', 'polynomial', 'inverse_sqrt', 'constant', 'constant_with_warmup']),
+    learning_rate: float = Input(description="learning rate, for learning!", default=2e-4, ge=0),
+    warmup_ratio: float = Input(description="pct of steps for a linear learning rate warmup", ge=0, le=0.5),
+    num_train_epochs: int = Input(description="number of training epochs", ge=1),
+    num_steps: int = Input(description="number of steps to run training for, supersedes num_train_epochs", default=None, ge=0),
+    logging_steps: int = Input(description="number of steps between logging epoch & loss", default=1),
+    #extra_args: dict = {},
+) -> Path:  
     reset_dir(CHECKPOINT_DIR)
     reset_dir(MODEL_OUT_PATH)
     print("loading model")
-    model, tokenizer = load_model(model_name_or_path)
+    model, tokenizer = load_model(model_weights)
     print("loading dataset")
     print(data_path)
     dataset = load_json(data_path)
@@ -143,12 +152,15 @@ def train(
             warmup_ratio=warmup_ratio,
             num_train_epochs=num_train_epochs,
             learning_rate=learning_rate,
-            **kwargs
+            num_steps=num_steps
         ),
         data_collator=CustomDataCollatorSeq2Seq(tokenizer),
     )
     trainer.train()
+    # tensorize!
     trainer.save_model(MODEL_OUT_PATH)
+
+    return Path(MODEL_OUT_PATH)
 
 
 if __name__ == "__main__":

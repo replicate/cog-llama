@@ -1,20 +1,19 @@
 from typing import List
 from cog import BasePredictor, Input
 from transformers import T5ForConditionalGeneration, T5Tokenizer
-from train import MODEL_OUT_PATH, MODEL_NAME
+from train import resolve_model
 import torch
 
-# TODO - this will fail 
-FINE_TUNED_NAME = MODEL_OUT_PATH
 
 class Predictor(BasePredictor):
-    def setup(self):
+    def setup(self, weights=None):
+        model_name = resolve_model(weights)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = T5ForConditionalGeneration.from_pretrained(
-            MODEL_NAME, cache_dir='pretrained_weights', torch_dtype=torch.float16, local_files_only=True
+            model_name, cache_dir='pretrained_weights', torch_dtype=torch.float16, local_files_only=True
         )
         self.model.to(self.device)
-        self.tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME)
+        self.tokenizer = T5Tokenizer.from_pretrained(model_name)
 
     def predict(
         self,
@@ -72,9 +71,10 @@ class Predictor(BasePredictor):
 class EightBitPredictor(Predictor):
     """subclass s.t. we can configure whether a model is loaded in 8bit mode from cog.yaml"""
 
-    def setup(self):
+    def setup(self, weights=None):
+        model_name = resolve_model(weights)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = T5ForConditionalGeneration.from_pretrained(
-            MODEL_NAME, local_files_only=True, load_in_8bit=True, device_map="auto"
+            model_name, local_files_only=True, load_in_8bit=True, device_map="auto"
         )
-        self.tokenizer = T5Tokenizer.from_pretrained(MODEL_NAME, local_files_only=True)
+        self.tokenizer = T5Tokenizer.from_pretrained(model_name, local_files_only=True)
