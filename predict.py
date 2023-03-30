@@ -2,9 +2,11 @@ from typing import List, Optional
 from cog import BasePredictor, Input
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 from train import MODEL_OUT_PATH, TOKENIZER_NAME
+from process_data import PROMPT_DICT
 import torch
 
 MODEL_NAME = MODEL_OUT_PATH
+PROMPT = PROMPT_DICT['prompt_no_input']
 
 
 class Predictor(BasePredictor):
@@ -46,6 +48,7 @@ class Predictor(BasePredictor):
             default=1,
         ),
     ) -> List[str]:
+        input = PROMPT.format_map({'instruction': prompt})
         input = self.tokenizer(prompt, return_tensors="pt").input_ids.to(self.device)
 
         outputs = self.model.generate(

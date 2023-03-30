@@ -1,6 +1,7 @@
 import json
 import argparse
 import os
+import shutil
 from typing import Optional
 
 from transformers import T5ForConditionalGeneration, T5Tokenizer
@@ -12,25 +13,17 @@ TOKENIZER_NAME = "google/flan-t5-base" # this is a hack
 MODEL_OUT_PATH = "tuned_weights"
 CHECKPOINT_DIR = "checkpoints"
 SAVE_STRATEGY = "epoch"
-os.makedirs(MODEL_OUT_PATH, exist_ok=True)
+
+def reset_dir(directory):
+    if os.path.exists(directory):
+        shutil.rmtree(directory)
+    os.makedirs(directory)
 
 
-class Preprocessor:
-    """Simple class to parse alpaca data and return dataset. Very dataset specific, not trying to be anything else."""
+class DatasetBuilder:
+    """Dataset agnostic class to take in input_ids and labels and spit out tokens"""
 
     def __init__(self, tokenizer):
-        self.prompt_dict = {
-            "prompt_input": (
-                "Below is an instruction that describes a task, paired with an input that provides further context. "
-                "Write a response that appropriately completes the request.\n\n"
-                "### Instruction:\n{instruction}\n\n### Input:\n{input}\n\n### Response:"
-            ),
-            "prompt_no_input": (
-                "Below is an instruction that describes a task. "
-                "Write a response that appropriately completes the request.\n\n"
-                "### Instruction:\n{instruction}\n\n### Response:"
-            ),
-        }
         self.tokenizer = tokenizer
 
     def batch_tokenize(self, texts):
@@ -45,13 +38,8 @@ class Preprocessor:
         ]
         return tokenized
 
-    def make_prompt(self, input_row):
-        if "input" in input_row.keys():
-            return self.prompt_dict["prompt_input"].format_map(input_row)
-        return self.prompt_dict["prompt_no_input"].format_map(input_row)
-
     def construct_dataset(self, input_data):
-        prompts = [self.make_prompt(val) for val in input_data]
+        prompts = [val['input_text'] for val in input_data]
         tokenized_input_ids = self.batch_tokenize(prompts)
         labels = [val["output"] for val in input_data]
         tokenized_labels = self.batch_tokenize(labels)
@@ -129,12 +117,14 @@ def train(
     num_train_epochs: int = 1,
     logging_steps: int = 1,
     **kwargs
-):
+):  
+    reset_dir(CHECKPOINT_DIR)
+    reset_dir(MODEL_OUT_PATH)
     print("loading model")
     model, tokenizer = load_model(model_name_or_path)
     print("loading dataset")
     dataset = load_json_string(data)
-    p = Preprocessor(tokenizer)
+    p = DatasetBuilder(tokenizer)
     train_data = p.construct_dataset(dataset)
     print("training")
     trainer = Trainer(
