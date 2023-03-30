@@ -7,4 +7,4 @@ python train.py \
     --learning_rate 3e-4 \
     --train_batch_size 8 \
     --warmup_ratio 0.03 \
-    --max_steps 10 # for testing
+    --max_steps 10 # number of steps before returning, mostly useful for testing performance
