@@ -1,31 +1,46 @@
-from typing import List
+from typing import List, Optional
 from collections import OrderedDict
-from cog import BasePredictor, Input
+from cog import BasePredictor, Input, Path
 from transformers import T5ForConditionalGeneration, T5Tokenizer, AutoConfig, AutoModelForSeq2SeqLM
-from train import resolve_model, load_tokenizer, MODEL_NAME
+from train import resolve_model, load_tokenizer, MODEL_NAME, DEFAULT_MODEL_NAME
 import os
 import torch
 from tensorizer import TensorDeserializer
 from tensorizer.utils import no_init_or_tensor
-# two things we need - configuration of model & configuration/actual tokenizer
-# in train, we...right now load configuration of model and model from the container
-# tokenizer doesn't change, just need to disambiguate model_name from tensorizer.
+import time
+
+#os.environ['COG_WEIGHTS'] = 'https://pbxt.replicate.delivery/3zc9rpb6wG66M9lwNCLbL4V1Lywjfg2Zi5eco8CMA84B0LtQA/tuned_weights.tensors'
+
+# if 'COG_WEIGHTS' not in os.environ:
+#     os.environ['COG_WEIGHTS'] = DEFAULT_MODEL_NAME
 
 class Predictor(BasePredictor):
-    def setup(self, weights='/src/tuned_weights.tensors'):
+    def setup(self, weights:Optional[Path] = None):
+        if weights is not None and weights.name == 'weights':
+            weights = None
+        print(weights)
+        # returns "weights"
+        # FIXME - we should use the actual "weights" argument here unless we decide not to
+        weights = None if 'COG_WEIGHTS' not in os.environ else os.environ["COG_WEIGHTS"]
+        print('weights path', weights)
         model_name = resolve_model(weights)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        if 'tensors' in weights: #TODO: this is not the best way to determine whether something is or is not tensorized.
-            self.model = self.load_tensorizer(weights)
+        if 'tensors' in model_name: #TODO: this is not the best way to determine whether something is or is not tensorized.
+            self.model = self.load_tensorizer(model_name)
         else:
+            st = time.time()
+            print(f'loading weights from {model_name} w/o tensorizer')
             self.model = T5ForConditionalGeneration.from_pretrained(
                 model_name, cache_dir='pretrained_weights', torch_dtype=torch.float16, local_files_only=True
             )
             self.model.to(self.device)
+            print(f'weights loaded in {time.time() - st}')
         self.tokenizer = load_tokenizer()
 
     def load_tensorizer(self, weights):
+        st = time.time()
+        print(f'deserializing weights from {weights}')
         config = AutoConfig.from_pretrained(MODEL_NAME)
 
         model = no_init_or_tensor(
@@ -35,6 +50,7 @@ class Predictor(BasePredictor):
         )
         des = TensorDeserializer(weights, plaid_mode=True)
         des.load_into_module(model)
+        print(f'weights loaded in {time.time() - st}')
         return model
 
     def predict(

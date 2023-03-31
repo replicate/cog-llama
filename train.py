@@ -11,6 +11,7 @@ from transformers import Trainer, TrainingArguments
 from cog import Input, BaseModel, Path, File
 from tensorizer import TensorSerializer
 
+DEFAULT_MODEL_NAME = "weights" # this is stored in the bowels of cog somewhere
 MODEL_NAME = "google/flan-t5-base" # this is a hack
 MODEL_OUT = "/src/tuned_weights.tensors"
 CHECKPOINT_DIR = "checkpoints"
@@ -96,7 +97,9 @@ def load_json(path):
 
 def resolve_model(model_name_or_path):
     if model_name_or_path is None:
+        print(f'returninng {MODEL_NAME} as weights')
         return MODEL_NAME
+    print(f'returning {model_name_or_path} as weights')
     return model_name_or_path
 
 
@@ -135,13 +138,13 @@ def train(
     model = load_model(model_weights)
     tokenizer = load_tokenizer()
     print("loading dataset")
-    print(data_path)
-    train_data = load_json(data_path)
+    print(train_data)
+    train_data = load_json(train_data)
     p = DatasetBuilder(tokenizer)
     train_dataset = p.construct_dataset(train_data)
     eval_dataset = None
-    if eval_data_path:
-        eval_data = load_json(eval_data_path)
+    if eval_data:
+        eval_data = load_json(eval_data)
         eval_dataset = p.construct_dataset(eval_data)
     print("training")
     trainer = Trainer(
