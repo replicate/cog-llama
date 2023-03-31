@@ -101,7 +101,6 @@ def resolve_model(model_name_or_path):
 
 
 def load_model(model_name_or_path):
-    # TODO: training from tensorizer
     model_name_or_path = resolve_model(model_name_or_path)
     model = T5ForConditionalGeneration.from_pretrained(
         model_name_or_path, cache_dir="pretrained_weights"
@@ -116,10 +115,9 @@ def load_tokenizer():
     )
 
 
-# TODO: eval
 def train(
-    data_path: Path = Input(description="path to data file to use for fine-tuning your model"),
-    eval_data_path: Path = Input(description="path to optional evaluation data file to use for model eval", default=None),
+    train_data: Path = Input(description="path to data file to use for fine-tuning your model"),
+    eval_data: Path = Input(description="path to optional evaluation data file to use for model eval", default=None),
     model_weights: Path = Input(description="location of weights that are going to be fine-tuned", default=None),
     train_batch_size: int = Input(description="batch size per GPU", default=8, ge=1),
     gradient_accumulation_steps: int = Input(description="number of training steps to update gradient for before performing a backward pass", default=8),
@@ -129,8 +127,7 @@ def train(
     num_train_epochs: int = Input(description="number of training epochs", ge=1, default=1),
     max_steps: int = Input(description="number of steps to run training for, supersedes num_train_epochs", default=None, ge=0),
     logging_steps: int = Input(description="number of steps between logging epoch & loss", default=1),
-    #extra_args: dict = {},
-) -> Path:  
+) -> TrainingOutput:  
     reset_dir(CHECKPOINT_DIR)
     if os.path.exists(MODEL_OUT):
         os.remove(MODEL_OUT)
