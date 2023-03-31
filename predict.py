@@ -3,6 +3,7 @@ from collections import OrderedDict
 from cog import BasePredictor, Input
 from transformers import T5ForConditionalGeneration, T5Tokenizer, AutoConfig, AutoModelForSeq2SeqLM
 from train import resolve_model, load_tokenizer, MODEL_NAME
+import os
 import torch
 from tensorizer import TensorDeserializer
 from tensorizer.utils import no_init_or_tensor
@@ -11,11 +12,11 @@ from tensorizer.utils import no_init_or_tensor
 # tokenizer doesn't change, just need to disambiguate model_name from tensorizer.
 
 class Predictor(BasePredictor):
-    def setup(self, weights='tuned_weights.tensorized'):
+    def setup(self, weights='/src/tuned_weights.tensors'):
         model_name = resolve_model(weights)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        if 'tensorized' in weights: #TODO: this is not the best way to determine whether something is or is not tensorized.
+        if 'tensors' in weights and os.path.exists(weights): #TODO: this is not the best way to determine whether something is or is not tensorized.
             self.model = self.load_tensorizer(weights)
         else:
             self.model = T5ForConditionalGeneration.from_pretrained(
@@ -34,7 +35,7 @@ class Predictor(BasePredictor):
         )
         des = TensorDeserializer(weights, plaid_mode=True)
         des.load_into_module(model)
-        self.model = model
+        return model
 
     def predict(
         self,

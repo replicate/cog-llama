@@ -12,7 +12,7 @@ from cog import Input, BaseModel, Path, File
 from tensorizer import TensorSerializer
 
 MODEL_NAME = "google/flan-t5-base" # this is a hack
-MODEL_OUT = "tuned_weights.tensorized"
+MODEL_OUT = "/src/tuned_weights.tensors"
 CHECKPOINT_DIR = "checkpoints"
 SAVE_STRATEGY = "epoch"
 
@@ -22,7 +22,7 @@ def reset_dir(directory):
     os.makedirs(directory)
 
 class TrainingOutput(BaseModel):
-    weights: File
+    weights: Path
 
 class DatasetBuilder:
     """Dataset agnostic class to take in input_ids and labels and spit out tokens"""
@@ -107,7 +107,7 @@ def load_model(model_name_or_path):
         model_name_or_path, cache_dir="pretrained_weights"
     )
 
-    return model, 
+    return model
 
 def load_tokenizer():
     """Same tokenizer, agnostic from tensorized weights/etc"""
@@ -124,14 +124,15 @@ def train(
     gradient_accumulation_steps: int = Input(description="number of training steps to update gradient for before performing a backward pass", default=8),
     lr_scheduler_type: str = Input(description="learning rate scheduler", default="cosine", choices=["linear", "cosine", 'cosine_with_restarts', 'polynomial', 'inverse_sqrt', 'constant', 'constant_with_warmup']),
     learning_rate: float = Input(description="learning rate, for learning!", default=2e-4, ge=0),
-    warmup_ratio: float = Input(description="pct of steps for a linear learning rate warmup", ge=0, le=0.5),
-    num_train_epochs: int = Input(description="number of training epochs", ge=1),
-    num_steps: int = Input(description="number of steps to run training for, supersedes num_train_epochs", default=None, ge=0),
+    warmup_ratio: float = Input(description="pct of steps for a linear learning rate warmup", ge=0, le=0.5, default=0.03),
+    num_train_epochs: int = Input(description="number of training epochs", ge=1, default=1),
+    max_steps: int = Input(description="number of steps to run training for, supersedes num_train_epochs", default=None, ge=0),
     logging_steps: int = Input(description="number of steps between logging epoch & loss", default=1),
     #extra_args: dict = {},
 ) -> Path:  
     reset_dir(CHECKPOINT_DIR)
-    reset_dir(MODEL_OUT)
+    if os.path.exists(MODEL_OUT):
+        os.remove(MODEL_OUT)
     print("loading model")
     model = load_model(model_weights)
     tokenizer = load_tokenizer()
@@ -157,7 +158,7 @@ def train(
             warmup_ratio=warmup_ratio,
             num_train_epochs=num_train_epochs,
             learning_rate=learning_rate,
-            num_steps=num_steps
+            max_steps=max_steps
         ),
         data_collator=CustomDataCollatorSeq2Seq(tokenizer),
     )
@@ -167,9 +168,8 @@ def train(
     serializer = TensorSerializer(MODEL_OUT)
     serializer.write_module(model)
     serializer.close()
-    #trainer.save_model(MODEL_OUT_PATH)
 
-    return TrainingOutput(weights=MODEL_OUT)
+    return TrainingOutput(weights=Path(MODEL_OUT))
 
 
 if __name__ == "__main__":
