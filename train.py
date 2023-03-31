@@ -8,11 +8,11 @@ from transformers import T5ForConditionalGeneration, T5Tokenizer
 from torch.utils.data import Dataset
 import torch
 from transformers import Trainer, TrainingArguments
-from pathlib import Path
-from cog import Input
+from cog import Input, BaseModel, Path, File
+from tensorizer import TensorSerializer
 
 MODEL_NAME = "google/flan-t5-base" # this is a hack
-MODEL_OUT_PATH = "tuned_weights"
+MODEL_OUT = "/src/tuned_weights.tensors"
 CHECKPOINT_DIR = "checkpoints"
 SAVE_STRATEGY = "epoch"
 
@@ -21,8 +21,8 @@ def reset_dir(directory):
         shutil.rmtree(directory)
     os.makedirs(directory)
 
-def get_model(weights):
-    if 
+class TrainingOutput(BaseModel):
+    weights: Path
 
 class DatasetBuilder:
     """Dataset agnostic class to take in input_ids and labels and spit out tokens"""
@@ -101,15 +101,19 @@ def resolve_model(model_name_or_path):
 
 
 def load_model(model_name_or_path):
-    # TODO: tensorizer
+    # TODO: training from tensorizer
     model_name_or_path = resolve_model(model_name_or_path)
     model = T5ForConditionalGeneration.from_pretrained(
         model_name_or_path, cache_dir="pretrained_weights"
     )
-    tokenizer = T5Tokenizer.from_pretrained(
-        model_name_or_path, cache_dir="pretrained_weights"
+
+    return model
+
+def load_tokenizer():
+    """Same tokenizer, agnostic from tensorized weights/etc"""
+    return T5Tokenizer.from_pretrained(
+        MODEL_NAME, cache_dir="pretrained_weights"
     )
-    return model, tokenizer
 
 
 # TODO: eval
@@ -120,16 +124,18 @@ def train(
     gradient_accumulation_steps: int = Input(description="number of training steps to update gradient for before performing a backward pass", default=8),
     lr_scheduler_type: str = Input(description="learning rate scheduler", default="cosine", choices=["linear", "cosine", 'cosine_with_restarts', 'polynomial', 'inverse_sqrt', 'constant', 'constant_with_warmup']),
     learning_rate: float = Input(description="learning rate, for learning!", default=2e-4, ge=0),
-    warmup_ratio: float = Input(description="pct of steps for a linear learning rate warmup", ge=0, le=0.5),
-    num_train_epochs: int = Input(description="number of training epochs", ge=1),
-    num_steps: int = Input(description="number of steps to run training for, supersedes num_train_epochs", default=None, ge=0),
+    warmup_ratio: float = Input(description="pct of steps for a linear learning rate warmup", ge=0, le=0.5, default=0.03),
+    num_train_epochs: int = Input(description="number of training epochs", ge=1, default=1),
+    max_steps: int = Input(description="number of steps to run training for, supersedes num_train_epochs", default=None, ge=0),
     logging_steps: int = Input(description="number of steps between logging epoch & loss", default=1),
     #extra_args: dict = {},
 ) -> Path:  
     reset_dir(CHECKPOINT_DIR)
-    reset_dir(MODEL_OUT_PATH)
+    if os.path.exists(MODEL_OUT):
+        os.remove(MODEL_OUT)
     print("loading model")
-    model, tokenizer = load_model(model_weights)
+    model = load_model(model_weights)
+    tokenizer = load_tokenizer()
     print("loading dataset")
     print(data_path)
     dataset = load_json(data_path)
@@ -152,15 +158,18 @@ def train(
             warmup_ratio=warmup_ratio,
             num_train_epochs=num_train_epochs,
             learning_rate=learning_rate,
-            num_steps=num_steps
+            max_steps=max_steps
         ),
         data_collator=CustomDataCollatorSeq2Seq(tokenizer),
     )
     trainer.train()
     # tensorize!
-    trainer.save_model(MODEL_OUT_PATH)
+    model = trainer.model
+    serializer = TensorSerializer(MODEL_OUT)
+    serializer.write_module(model)
+    serializer.close()
 
-    return Path(MODEL_OUT_PATH)
+    return TrainingOutput(weights=Path(MODEL_OUT))
 
 
 if __name__ == "__main__":
