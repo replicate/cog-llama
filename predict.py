@@ -16,7 +16,7 @@ class Predictor(BasePredictor):
         model_name = resolve_model(weights)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        if 'tensors' in weights and os.path.exists(weights): #TODO: this is not the best way to determine whether something is or is not tensorized.
+        if 'tensors' in weights: #TODO: this is not the best way to determine whether something is or is not tensorized.
             self.model = self.load_tensorizer(weights)
         else:
             self.model = T5ForConditionalGeneration.from_pretrained(
