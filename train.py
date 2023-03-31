@@ -119,6 +119,7 @@ def load_tokenizer():
 # TODO: eval
 def train(
     data_path: Path = Input(description="path to data file to use for fine-tuning your model"),
+    eval_data_path: Path = Input(description="path to optional evaluation data file to use for model eval", default=None),
     model_weights: Path = Input(description="location of weights that are going to be fine-tuned", default=None),
     train_batch_size: int = Input(description="batch size per GPU", default=8, ge=1),
     gradient_accumulation_steps: int = Input(description="number of training steps to update gradient for before performing a backward pass", default=8),
@@ -138,14 +139,18 @@ def train(
     tokenizer = load_tokenizer()
     print("loading dataset")
     print(data_path)
-    dataset = load_json(data_path)
+    train_data = load_json(data_path)
     p = DatasetBuilder(tokenizer)
-    train_data = p.construct_dataset(dataset)
+    train_dataset = p.construct_dataset(train_data)
+    eval_dataset = None
+    if eval_data_path:
+        eval_data = load_json(eval_data_path)
+        eval_dataset = p.construct_dataset(eval_data)
     print("training")
     trainer = Trainer(
         model=model,
-        train_dataset=train_data,
-        eval_dataset=None,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
         args=TrainingArguments(
             tf32=True,
             output_dir=CHECKPOINT_DIR,
@@ -168,9 +173,10 @@ def train(
     serializer = TensorSerializer(MODEL_OUT)
     serializer.write_module(model)
     serializer.close()
-
-    return TrainingOutput(weights=Path(MODEL_OUT))
-
+    
+    path_out = Path(MODEL_OUT)
+    to_return = TrainingOutput(weights=path_out)
+    return to_return
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
