@@ -3,16 +3,15 @@ import argparse
 import os
 import shutil
 from typing import Optional
+from config import HUGGINGFACE_MODEL_NAME, load_tokenizer
 
-from transformers import T5ForConditionalGeneration, T5Tokenizer
+from transformers import T5ForConditionalGeneration
 from torch.utils.data import Dataset
 import torch
 from transformers import Trainer, TrainingArguments
 from cog import Input, BaseModel, Path, File
 from tensorizer import TensorSerializer
 
-DEFAULT_MODEL_NAME = "weights" # this is stored in the bowels of cog somewhere
-MODEL_NAME = "google/flan-t5-base" # this is a hack
 MODEL_OUT = "/src/tuned_weights.tensors"
 CHECKPOINT_DIR = "checkpoints"
 SAVE_STRATEGY = "epoch"
@@ -95,28 +94,15 @@ def load_json(path):
         data = json.load(f)
     return data
 
-def resolve_model(model_name_or_path):
-    if model_name_or_path is None:
-        print(f'returninng {MODEL_NAME} as weights')
-        return MODEL_NAME
-    print(f'returning {model_name_or_path} as weights')
-    return model_name_or_path
-
 
 def load_model(model_name_or_path):
-    model_name_or_path = resolve_model(model_name_or_path)
+    if model_name_or_path is None:
+        model_name_or_path = HUGGINGFACE_MODEL_NAME
     model = T5ForConditionalGeneration.from_pretrained(
         model_name_or_path, cache_dir="pretrained_weights"
     )
 
     return model
-
-def load_tokenizer():
-    """Same tokenizer, agnostic from tensorized weights/etc"""
-    return T5Tokenizer.from_pretrained(
-        MODEL_NAME, cache_dir="pretrained_weights"
-    )
-
 
 def train(
     train_data: Path = Input(description="path to data file to use for fine-tuning your model"),
@@ -219,3 +205,4 @@ if __name__ == "__main__":
 
     some_args = parser.parse_args()
     train(**vars(some_args))
+
