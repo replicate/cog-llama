@@ -21,5 +21,5 @@ build:
     - "jinja2==3.1.2"
 
 # predict.py defines how predictions are run on your model
-predict: "predict.py:Predictor"
+predict: "{{predictor}}"
 train: "train.py:train"
