@@ -1,6 +1,7 @@
 import time
 from collections import OrderedDict
 from typing import List, Optional
+import os
 
 import torch
 from cog import BasePredictor, Input, Path
@@ -11,17 +12,15 @@ from transformers import (AutoConfig, AutoModelForSeq2SeqLM,
 
 from config import HUGGINGFACE_MODEL_NAME, load_tokenizer
 
-
 class Predictor(BasePredictor):
     def setup(self, weights:Optional[Path] = None):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         if weights is not None and weights.name == 'weights':
             # bugfix
             weights = None
-
         if weights is None:
             self.model = self.load_huggingface_model(weights=HUGGINGFACE_MODEL_NAME)
-        elif 'tensors' in weights.filename: # assuming URLPath for now
+        elif hasattr(weights, 'filename') and 'tensors' in weights.filename: 
             self.model = self.load_tensorizer(weights)
         else:
             self.model = self.load_huggingface_model(weights=weights)

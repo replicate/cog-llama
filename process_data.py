@@ -38,9 +38,14 @@ class Preprocessor:
             return self.prompt_dict["prompt_input"].format_map(input_row)
         return self.prompt_dict["prompt_no_input"].format_map(input_row)
 
+    def make_short_prompt(self, input_row):
+        if len(input_row["input"]) > 1:
+            return f'''{input_row['instruction']}\n{input_row['input']}'''
+        return input_row['instruction']
+
     def construct_dataset(self, input_data):
-        prompts = [self.make_prompt(val) for val in input_data]
-        return [{'prompt':val[0], 'output':val[1]} for val in zip(prompts, [val["output"] for val in input_data])]
+        prompts = [self.make_short_prompt(val) for val in input_data]
+        return [{'prompt':val[0], 'completion':val[1]} for val in zip(prompts, [val["output"] for val in input_data])]
 
 if __name__ == '__main__':
     proc = Preprocessor(T5Tokenizer.from_pretrained('google/flan-t5-xl'))
@@ -49,5 +54,5 @@ if __name__ == '__main__':
 
     data_out = proc.construct_dataset(data)
 
-    with open('replicate_alpaca_data.json', 'w') as f:
+    with open('short_alpaca_data.json', 'w') as f:
         json.dump(data_out, f, indent=2)
