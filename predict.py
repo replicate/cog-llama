@@ -11,8 +11,6 @@ from transformers import (AutoConfig, AutoModelForSeq2SeqLM,
 
 from config import HUGGINGFACE_MODEL_NAME, load_tokenizer
 
-#os.environ['COG_WEIGHTS'] = 'https://pbxt.replicate.delivery/3zc9rpb6wG66M9lwNCLbL4V1Lywjfg2Zi5eco8CMA84B0LtQA/tuned_weights.tensors'
-
 
 class Predictor(BasePredictor):
     def setup(self, weights:Optional[Path] = None):
@@ -34,7 +32,7 @@ class Predictor(BasePredictor):
         st = time.time()
         print(f'loading weights from {weights} w/o tensorizer')
         model = T5ForConditionalGeneration.from_pretrained(
-            weights, cache_dir='pretrained_weights', torch_dtype=torch.float16, local_files_only=True
+            weights, cache_dir='pretrained_weights', torch_dtype=torch.float16
         )
         model.to(self.device)
         print(f'weights loaded in {time.time() - st}')
@@ -112,10 +110,13 @@ class Predictor(BasePredictor):
 class EightBitPredictor(Predictor):
     """subclass s.t. we can configure whether a model is loaded in 8bit mode from cog.yaml"""
 
-    def setup(self, weights=None):
-        model_name = resolve_model(weights)
+    def setup(self, weights:Optional[Path] = None):
+        if weights is not None and weights.name == 'weights':
+            # bugfix
+            weights = None
+        # TODO: fine-tuned 8bit weights.
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = T5ForConditionalGeneration.from_pretrained(
-            model_name, local_files_only=True, load_in_8bit=True, device_map="auto"
+            HUGGINGFACE_MODEL_NAME, load_in_8bit=True, device_map="auto"
         )
-        self.tokenizer = T5Tokenizer.from_pretrained(model_name, local_files_only=True)
+        self.tokenizer = load_tokenizer()

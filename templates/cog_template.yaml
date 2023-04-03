@@ -19,7 +19,8 @@ build:
     - "sentencepiece==0.1.97"
     - "tensorizer==1.0.1"
     - "jinja2==3.1.2"
+    {{extra_deps}}
 
 # predict.py defines how predictions are run on your model
-predict: "predict.py:Predictor"
+predict: "{{predictor}}"
 train: "train.py:train"
