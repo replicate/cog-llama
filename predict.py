@@ -110,7 +110,7 @@ class Predictor(BasePredictor):
 class EightBitPredictor(Predictor):
     """subclass s.t. we can configure whether a model is loaded in 8bit mode from cog.yaml"""
 
-    def setup(self, weights=None):
+    def setup(self, weights:Optional[Path] = None):
         if weights is not None and weights.name == 'weights':
             # bugfix
             weights = None

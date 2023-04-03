@@ -5,28 +5,28 @@ from jinja2 import Template
 
 # Flan configs, can modify as 
 CONFIGS = {
-    "small": {
+    "flan-t5-small": {
         "cog_yaml_parameters": {"predictor":"predict.py:Predictor"},
         "config_py_parameters": {"model_name": "google/flan-t5-small"}
     },
-    "base": {
+    "flan-t5-base": {
         "cog_yaml_parameters": {"predictor":"predict.py:Predictor"},
         "config_py_parameters": {"model_name": "google/flan-t5-base"}
     },
-    "large": {
+    "flan-t5-large": {
         "cog_yaml_parameters": {"predictor":"predict.py:Predictor"},
         "config_py_parameters": {"model_name": "google/flan-t5-large"}
     },
-    "xl": {
+    "flan-t5-xl": {
         "cog_yaml_parameters": {"predictor":"predict.py:Predictor"},
         "config_py_parameters": {"model_name": "google/flan-t5-xl"}
     },
-    "xxl": {
+    "flan-t5-xxl": {
         "cog_yaml_parameters": {"predictor":"predict.py:Predictor"},
         "config_py_parameters": {"model_name": "google/flan-t5-xxl"}
     },
-    "ul2": {
-        "cog_yaml_parameters": {"predictor":"predict.py:EightBitPredictor"},
+    "flan-ul2": {
+        "cog_yaml_parameters": {"predictor":"predict.py:EightBitPredictor", "extra_deps":'''- "bitsandbytes==0.37.2"'''},
         "config_py_parameters": {"model_name": "google/flan-ul2"}
     }
 }
