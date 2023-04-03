@@ -131,6 +131,9 @@ def train(
     if eval_data:
         eval_data = load_json(eval_data)
         eval_dataset = p.construct_dataset(eval_data)
+    if max_steps is None:
+        # This is the default value in transformers
+        max_steps = -1
     print("Training...")
     trainer = Trainer(
         model=model,
