@@ -120,11 +120,10 @@ def train(
     reset_dir(CHECKPOINT_DIR)
     if os.path.exists(MODEL_OUT):
         os.remove(MODEL_OUT)
-    print("loading model")
+    print("Loading model...")
     model = load_model(model_weights)
     tokenizer = load_tokenizer()
-    print("loading dataset")
-    print(train_data)
+    print(f"Loading dataset '{train_data}'...")
     train_data = load_json(train_data)
     p = DatasetBuilder(tokenizer)
     train_dataset = p.construct_dataset(train_data)
@@ -132,7 +131,7 @@ def train(
     if eval_data:
         eval_data = load_json(eval_data)
         eval_dataset = p.construct_dataset(eval_data)
-    print("training")
+    print("Training...")
     trainer = Trainer(
         model=model,
         train_dataset=train_dataset,
