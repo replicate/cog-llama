@@ -131,10 +131,8 @@ class Predictor(BasePredictor):
                     prev_ids.append(cur_id)
                     continue
 
-            # remove last token if a </s> token
-            if prev_ids[-1] == 1:
-                prev_ids.pop()
-            token = self.tokenizer.decode(prev_ids)
+            # remove any special tokens such as </s>
+            token = self.tokenizer.decode(prev_ids, skip_special_tokens=True)
             yield token
 
         if debug:
