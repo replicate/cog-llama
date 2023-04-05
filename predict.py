@@ -116,7 +116,7 @@ class Predictor(BasePredictor):
 
                     # there are tokens to yield
                     else:
-                        token = self.tokenizer.decode(prev_ids)
+                        token = " " + self.tokenizer.decode(prev_ids)
                         prev_ids = [cur_id]
 
                         if not first_token_yielded:
@@ -129,7 +129,11 @@ class Predictor(BasePredictor):
                     continue
 
             # remove any special tokens such as </s>
-            token = self.tokenizer.decode(prev_ids, skip_special_tokens=True)
+            token = " " + self.tokenizer.decode(prev_ids, skip_special_tokens=True)
+            if not first_token_yielded:
+                # no leading space for first token
+                token = token.strip()
+                first_token_yielded = True
             yield token
 
         if debug:
