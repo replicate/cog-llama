@@ -1,13 +1,14 @@
+import os
 import time
 from collections import OrderedDict
-from typing import List, Optional, Any
-import os
+from typing import Any, List, Optional
 
 import torch
-from cog import BasePredictor, Input, Path, ConcatenateIterator
+from cog import BasePredictor, ConcatenateIterator, Input, Path
 from tensorizer import TensorDeserializer
 from tensorizer.utils import no_init_or_tensor
-from transformers import AutoConfig, AutoModelForSeq2SeqLM, T5ForConditionalGeneration
+from transformers import (AutoConfig, AutoModelForSeq2SeqLM,
+                          T5ForConditionalGeneration)
 
 from config import HUGGINGFACE_MODEL_NAME, load_tokenizer
 from subclass import YieldingT5

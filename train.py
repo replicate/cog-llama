@@ -1,38 +1,42 @@
-import json
 import argparse
+import json
 import os
 import shutil
 from typing import Optional
-from config import HUGGINGFACE_MODEL_NAME, load_tokenizer
 
-from transformers import T5ForConditionalGeneration
-from torch.utils.data import Dataset
-import torch.distributed as dist
-import torch
-from transformers import Trainer, TrainingArguments
-from cog import Input, BaseModel, Path, File
-from tensorizer import TensorSerializer
-from peft import prepare_model_for_int8_training, LoraConfig, get_peft_model, TaskType
 import deepspeed
+import torch
+import torch.distributed as dist
+from cog import BaseModel, File, Input, Path
+from peft import (LoraConfig, TaskType, get_peft_model,
+                  prepare_model_for_int8_training)
+from tensorizer import TensorSerializer
+from torch.utils.data import Dataset
+from transformers import T5ForConditionalGeneration, Trainer, TrainingArguments
+
+from config import HUGGINGFACE_MODEL_NAME, load_tokenizer
 
 MODEL_OUT = "/src/tuned_weights.tensors"
 CHECKPOINT_DIR = "checkpoints"
 SAVE_STRATEGY = "epoch"
 DIST_OUT_DIR = "tmp/model"
 
+
 def is_distributed_run():
-    required_env_vars = ['RANK', 'LOCAL_RANK', 'WORLD_SIZE']
+    required_env_vars = ["RANK", "LOCAL_RANK", "WORLD_SIZE"]
     return all(env_var in os.environ for env_var in required_env_vars)
 
 
 def reset_dir(directory):
-    if (not is_distributed_run()) or os.environ['RANK'] == '0':
+    if (not is_distributed_run()) or os.environ["RANK"] == "0":
         if os.path.exists(directory):
             shutil.rmtree(directory)
         os.makedirs(directory)
 
+
 class TrainingOutput(BaseModel):
     weights: Path
+
 
 class DatasetBuilder:
     """Dataset agnostic class to take in input_ids and labels and spit out tokens"""
@@ -44,17 +48,14 @@ class DatasetBuilder:
         """Tokenizes text. Presently doesn't pad inputs, just returns input ids."""
         tokenized = [
             self.tokenizer(
-                prompt,
-                return_tensors="pt",
-                padding="longest",
-                truncation=True
+                prompt, return_tensors="pt", padding="longest", truncation=True
             ).input_ids
             for prompt in texts
         ]
         return tokenized
 
     def construct_dataset(self, input_data):
-        prompts = [val['prompt'] for val in input_data]
+        prompts = [val["prompt"] for val in input_data]
         tokenized_input_ids = self.batch_tokenize(prompts)
         labels = [val["completion"] for val in input_data]
         tokenized_labels = self.batch_tokenize(labels)
@@ -86,7 +87,9 @@ class CustomDataCollatorSeq2Seq:
         # taking advantage of tensor cores, perhaps
         multiple = self.multiple_of
         target_length = (tensor.size(0) + multiple - 1) // multiple * multiple
-        return torch.nn.functional.pad(tensor, (0, target_length - tensor.size(0)), value=value)
+        return torch.nn.functional.pad(
+            tensor, (0, target_length - tensor.size(0)), value=value
+        )
 
     def __call__(self, instances):
         input_ids, labels = tuple(
@@ -94,7 +97,10 @@ class CustomDataCollatorSeq2Seq:
             for key in ("input_ids", "labels")
         )
         if self.multiple_of:
-            input_ids = [self.pad_to_multiple(val, self.tokenizer.pad_token_id) for val in input_ids]
+            input_ids = [
+                self.pad_to_multiple(val, self.tokenizer.pad_token_id)
+                for val in input_ids
+            ]
             labels = [self.pad_to_multiple(val, -100) for val in labels]
 
         input_ids = torch.nn.utils.rnn.pad_sequence(
@@ -112,17 +118,19 @@ class CustomDataCollatorSeq2Seq:
 
 
 def load_data(path):
-    if path.suffix == '.json':
+    if path.suffix == ".json":
         return load_json(path)
-    elif path.suffix == '.jsonl':
+    elif path.suffix == ".jsonl":
         return load_jsonl(path)
     else:
-        raise Exception(f'file type {path} not supported. Currently supported types are json, jsonl')
+        raise Exception(
+            f"file type {path} not supported. Currently supported types are json, jsonl"
+        )
 
 
 def load_jsonl(path):
     data = []
-    with open(path, 'r') as f:
+    with open(path, "r") as f:
         for line in f:
             json_object = json.loads(line)
             data.append(json_object)
@@ -146,44 +154,52 @@ def load_model(model_name_or_path):
     return model
 
 
-def load_peft_model(model_name_or_path, lora_rank: int, lora_alpha: int, lora_dropout: float):
+def load_peft_model(
+    model_name_or_path, lora_rank: int, lora_alpha: int, lora_dropout: float
+):
     if model_name_or_path is None:
         model_name_or_path = HUGGINGFACE_MODEL_NAME
     model = T5ForConditionalGeneration.from_pretrained(
-        model_name_or_path, cache_dir="pretrained_weights", torch_dtype=torch.float16, load_in_8bit=True, device_map="auto"
-    )    
+        model_name_or_path,
+        cache_dir="pretrained_weights",
+        torch_dtype=torch.float16,
+        load_in_8bit=True,
+        device_map="auto",
+    )
     model = prepare_model_for_int8_training(model)
     config = LoraConfig(
-        r = lora_rank,
+        r=lora_rank,
         lora_alpha=lora_alpha,
         lora_dropout=lora_dropout,
-        bias='none',
-        task_type=TaskType.SEQ_2_SEQ_LM
+        bias="none",
+        task_type=TaskType.SEQ_2_SEQ_LM,
     )
     model = get_peft_model(model, config)
     return model
 
 
-def distributed_train(train_data: Path,
-            eval_data: Path,
-            weights: Optional[Path],
-            train_batch_size: int,
-            gradient_accumulation_steps: int,
-            lr_scheduler_type: str,
-            learning_rate: float,
-            warmup_ratio: float,
-            num_train_epochs: int,
-            max_steps: int,
-            logging_steps: int):
-    print('distributing training')
+def distributed_train(
+    train_data: Path,
+    eval_data: Path,
+    weights: Optional[Path],
+    train_batch_size: int,
+    gradient_accumulation_steps: int,
+    lr_scheduler_type: str,
+    learning_rate: float,
+    warmup_ratio: float,
+    num_train_epochs: int,
+    max_steps: int,
+    logging_steps: int,
+):
+    print("distributing training")
     num_devices = torch.cuda.device_count()
 
     def _arg_if_present(var, var_name):
         """Need to wrap any arguments whose default value in train() is `None`"""
         if var:
-            return f'--{var_name} {var}'
-        return ''
-    
+            return f"--{var_name} {var}"
+        return ""
+
     dist_command = f"""torchrun --nproc_per_node={num_devices} --master_port=9292 train.py \
     --train_data {train_data} \
     {_arg_if_present(eval_data, 'eval_data')} \
@@ -198,24 +214,61 @@ def distributed_train(train_data: Path,
     --max_steps {max_steps} 
     """
     res = os.system(dist_command)
-    if res > 0: 
+    if res > 0:
         raise Exception(f"Distributed training failed w/exit code {res}")
     return
 
 
 def train(
-    train_data: Path = Input(description="path to data file to use for fine-tuning your model"),
-    eval_data: Path = Input(description="path to optional evaluation data file to use for model eval", default=None),
-    weights: Path = Input(description="location of weights that are going to be fine-tuned", default=None),
+    train_data: Path = Input(
+        description="path to data file to use for fine-tuning your model"
+    ),
+    eval_data: Path = Input(
+        description="path to optional evaluation data file to use for model eval",
+        default=None,
+    ),
+    weights: Path = Input(
+        description="location of weights that are going to be fine-tuned", default=None
+    ),
     train_batch_size: int = Input(description="batch size per GPU", default=8, ge=1),
-    gradient_accumulation_steps: int = Input(description="number of training steps to update gradient for before performing a backward pass", default=8),
-    lr_scheduler_type: str = Input(description="learning rate scheduler", default="cosine", choices=["linear", "cosine", 'cosine_with_restarts', 'polynomial', 'inverse_sqrt', 'constant', 'constant_with_warmup']),
-    learning_rate: float = Input(description="learning rate, for learning!", default=2e-4, ge=0),
-    warmup_ratio: float = Input(description="pct of steps for a linear learning rate warmup", ge=0, le=0.5, default=0.03),
-    num_train_epochs: int = Input(description="number of training epochs", ge=1, default=1),
-    max_steps: int = Input(description="number of steps to run training for, supersedes num_train_epochs", default=-1, ge=0),
-    logging_steps: int = Input(description="number of steps between logging epoch & loss", default=1)
-    ) -> TrainingOutput:
+    gradient_accumulation_steps: int = Input(
+        description="number of training steps to update gradient for before performing a backward pass",
+        default=8,
+    ),
+    lr_scheduler_type: str = Input(
+        description="learning rate scheduler",
+        default="cosine",
+        choices=[
+            "linear",
+            "cosine",
+            "cosine_with_restarts",
+            "polynomial",
+            "inverse_sqrt",
+            "constant",
+            "constant_with_warmup",
+        ],
+    ),
+    learning_rate: float = Input(
+        description="learning rate, for learning!", default=2e-4, ge=0
+    ),
+    warmup_ratio: float = Input(
+        description="pct of steps for a linear learning rate warmup",
+        ge=0,
+        le=0.5,
+        default=0.03,
+    ),
+    num_train_epochs: int = Input(
+        description="number of training epochs", ge=1, default=1
+    ),
+    max_steps: int = Input(
+        description="number of steps to run training for, supersedes num_train_epochs",
+        default=-1,
+        ge=0,
+    ),
+    logging_steps: int = Input(
+        description="number of steps between logging epoch & loss", default=1
+    ),
+) -> TrainingOutput:
     dist_kickoff_process = False
     if torch.cuda.device_count() > 1 and not is_distributed_run():
         reset_dir(DIST_OUT_DIR)
@@ -230,7 +283,8 @@ def train(
             warmup_ratio,
             num_train_epochs,
             max_steps,
-            logging_steps)
+            logging_steps,
+        )
         dist_kickoff_process = True
     else:
         reset_dir(CHECKPOINT_DIR)
@@ -274,12 +328,14 @@ def train(
                     learning_rate=learning_rate,
                     max_steps=max_steps,
                     fsdp="full_shard auto_wrap",
-                    fsdp_transformer_layer_cls_to_wrap='T5Block',
+                    fsdp_transformer_layer_cls_to_wrap="T5Block",
                     tf32=True,
                     bf16=True,
-                    half_precision_backend="cuda_amp"
+                    half_precision_backend="cuda_amp",
                 ),
-                data_collator=CustomDataCollatorSeq2Seq(tokenizer, 8) # depends on bf16 value
+                data_collator=CustomDataCollatorSeq2Seq(
+                    tokenizer, 8
+                ),  # depends on bf16 value
             )
         else:
             trainer = Trainer(
@@ -300,9 +356,11 @@ def train(
                     max_steps=max_steps,
                     tf32=True,
                     bf16=True,
-                    half_precision_backend="cuda_amp"
+                    half_precision_backend="cuda_amp",
                 ),
-                data_collator=CustomDataCollatorSeq2Seq(tokenizer, 8) # depends on bf16 value
+                data_collator=CustomDataCollatorSeq2Seq(
+                    tokenizer, 8
+                ),  # depends on bf16 value
             )
         trainer.train()
 
@@ -321,15 +379,16 @@ def train(
 
     if dist_kickoff_process:
         # load model saved by distributed process & tensorize it
-        model = T5ForConditionalGeneration.from_pretrained(DIST_OUT_DIR).to('cuda')
+        model = T5ForConditionalGeneration.from_pretrained(DIST_OUT_DIR).to("cuda")
         serializer = TensorSerializer(MODEL_OUT)
         serializer.write_module(model)
         serializer.close()
 
-    # distributed train will still return this path    
+    # distributed train will still return this path
     path_out = Path(MODEL_OUT)
     to_return = TrainingOutput(weights=path_out)
     return to_return
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -339,7 +398,11 @@ if __name__ == "__main__":
         "--train_data", type=Path, required=True, help="Path to the json dataset"
     )
     parser.add_argument(
-        "--eval_data", type=Path, required=False, help="Path to the json dataset", default=None
+        "--eval_data",
+        type=Path,
+        required=False,
+        help="Path to the json dataset",
+        default=None,
     )
     parser.add_argument(
         "--weights",
@@ -404,16 +467,11 @@ if __name__ == "__main__":
     #     default=0.4,
     #     help="Number of training steps to run, overrides num_train_epochs, useful for testing",
     # )
-    parser.add_argument(
-        "--logging_steps",
-        type=int,
-        default=1
-    )
+    parser.add_argument("--logging_steps", type=int, default=1)
     parser.add_argument(
         "--lr_scheduler_type",
         type=str,
-        default='cosine',
+        default="cosine",
     )
     some_args = parser.parse_args()
     train(**vars(some_args))
-
