@@ -44,7 +44,7 @@ class Predictor(BasePredictor):
         config = AutoConfig.from_pretrained(HUGGINGFACE_MODEL_NAME)
 
         model = no_init_or_tensor(
-            lambda: AutoModelForSeq2SeqLM.from_pretrained(
+            lambda: YieldingT5.from_pretrained(
                 None, config=config, state_dict=OrderedDict()
             )
         )
@@ -56,9 +56,6 @@ class Predictor(BasePredictor):
     def predict(
         self,
         prompt: str = Input(description=f"Prompt to send to FLAN-T5."),
-        # n: int = Input(
-        #     description="Number of output sequences to generate", default=1, ge=1, le=5
-        # ),
         max_length: int = Input(
             description="Maximum number of tokens to generate. A word is generally 2-3 tokens",
             ge=1,
@@ -119,7 +116,6 @@ class Predictor(BasePredictor):
                     # there are tokens to yield
                     else:
                         token = self.tokenizer.decode(prev_ids)
-                        print(f"yielding token: {token}")
                         prev_ids = [cur_id]
 
                         if not first_token_yielded:
