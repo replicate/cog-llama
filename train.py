@@ -256,30 +256,54 @@ def train(
             eval_dataset = p.construct_dataset(eval_data)
 
         print("Training...")
-        trainer = Trainer(
-            model=model,
-            train_dataset=train_dataset,
-            eval_dataset=eval_dataset,
-            args=TrainingArguments(
-                output_dir=CHECKPOINT_DIR,
-                per_device_train_batch_size=train_batch_size,
-                gradient_accumulation_steps=gradient_accumulation_steps,
-                save_strategy=SAVE_STRATEGY,
-                save_total_limit=1,
-                logging_steps=logging_steps,
-                lr_scheduler_type=lr_scheduler_type,
-                warmup_ratio=warmup_ratio,
-                num_train_epochs=num_train_epochs,
-                learning_rate=learning_rate,
-                max_steps=max_steps,
-                fsdp="full_shard auto_wrap",
-                fsdp_transformer_layer_cls_to_wrap='T5Block',
-                tf32=True,
-                bf16=True,
-                half_precision_backend="cuda_amp"
-            ),
-            data_collator=CustomDataCollatorSeq2Seq(tokenizer, 8) # depends on bf16 value
-        )
+        if is_distributed_run():
+            trainer = Trainer(
+                model=model,
+                train_dataset=train_dataset,
+                eval_dataset=eval_dataset,
+                args=TrainingArguments(
+                    output_dir=CHECKPOINT_DIR,
+                    per_device_train_batch_size=train_batch_size,
+                    gradient_accumulation_steps=gradient_accumulation_steps,
+                    save_strategy=SAVE_STRATEGY,
+                    save_total_limit=1,
+                    logging_steps=logging_steps,
+                    lr_scheduler_type=lr_scheduler_type,
+                    warmup_ratio=warmup_ratio,
+                    num_train_epochs=num_train_epochs,
+                    learning_rate=learning_rate,
+                    max_steps=max_steps,
+                    fsdp="full_shard auto_wrap",
+                    fsdp_transformer_layer_cls_to_wrap='T5Block',
+                    tf32=True,
+                    bf16=True,
+                    half_precision_backend="cuda_amp"
+                ),
+                data_collator=CustomDataCollatorSeq2Seq(tokenizer, 8) # depends on bf16 value
+            )
+        else:
+            trainer = Trainer(
+                model=model,
+                train_dataset=train_dataset,
+                eval_dataset=eval_dataset,
+                args=TrainingArguments(
+                    output_dir=CHECKPOINT_DIR,
+                    per_device_train_batch_size=train_batch_size,
+                    gradient_accumulation_steps=gradient_accumulation_steps,
+                    save_strategy=SAVE_STRATEGY,
+                    save_total_limit=1,
+                    logging_steps=logging_steps,
+                    lr_scheduler_type=lr_scheduler_type,
+                    warmup_ratio=warmup_ratio,
+                    num_train_epochs=num_train_epochs,
+                    learning_rate=learning_rate,
+                    max_steps=max_steps,
+                    tf32=True,
+                    bf16=True,
+                    half_precision_backend="cuda_amp"
+                ),
+                data_collator=CustomDataCollatorSeq2Seq(tokenizer, 8) # depends on bf16 value
+            )
         trainer.train()
 
         # tensorize!
