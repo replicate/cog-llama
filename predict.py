@@ -24,6 +24,8 @@ class Predictor(BasePredictor):
             self.model = self.load_huggingface_model(weights=HUGGINGFACE_MODEL_NAME)
         elif hasattr(weights, "filename") and "tensors" in weights.filename:
             self.model = self.load_tensorizer(weights)
+        elif hasattr(weights, "suffix") and "tensors" in weights.suffix:
+            self.model = self.load_tensorizer(weights)
         else:
             self.model = self.load_huggingface_model(weights=weights)
 
