@@ -60,7 +60,7 @@ def write_configs(model_name):
     
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument("--model_name", default="base", help="name of the flan-t5 model you want to configure cog for")
+    parser.add_argument("--model_name", default="flan-t5-base", help="name of the flan-t5 model you want to configure cog for")
     args = parser.parse_args()
 
     write_configs(args.model_name)

@@ -1,15 +1,10 @@
 import argparse
 import json
-import os
-import shutil
-from typing import Optional
 
 import torch
-import torch.distributed as dist
-from cog import BaseModel, File, Input, Path
+from cog import Input, Path
 from peft import (LoraConfig, TaskType, get_peft_model,
                   prepare_model_for_int8_training)
-from tensorizer import TensorSerializer
 from torch.utils.data import Dataset
 from transformers import T5ForConditionalGeneration, Trainer, TrainingArguments
 
@@ -19,22 +14,6 @@ MODEL_OUT = "/src/tuned_weights.tensors"
 CHECKPOINT_DIR = "checkpoints"
 SAVE_STRATEGY = "epoch"
 DIST_OUT_DIR = "tmp/model"
-
-
-def is_distributed_run():
-    required_env_vars = ["RANK", "LOCAL_RANK", "WORLD_SIZE"]
-    return all(env_var in os.environ for env_var in required_env_vars)
-
-
-def reset_dir(directory):
-    if (not is_distributed_run()) or os.environ["RANK"] == "0":
-        if os.path.exists(directory):
-            shutil.rmtree(directory)
-        os.makedirs(directory)
-
-
-class TrainingOutput(BaseModel):
-    weights: Path
 
 
 class DatasetBuilder:
@@ -177,47 +156,6 @@ def load_peft_model(
     return model
 
 
-def distributed_train(
-    train_data: Path,
-    eval_data: Path,
-    weights: Optional[Path],
-    train_batch_size: int,
-    gradient_accumulation_steps: int,
-    lr_scheduler_type: str,
-    learning_rate: float,
-    warmup_ratio: float,
-    num_train_epochs: int,
-    max_steps: int,
-    logging_steps: int,
-):
-    print("distributing training")
-    num_devices = torch.cuda.device_count()
-
-    def _arg_if_present(var, var_name):
-        """Need to wrap any arguments whose default value in train() is `None`"""
-        if var:
-            return f"--{var_name} {var}"
-        return ""
-
-    dist_command = f"""torchrun --nproc_per_node={num_devices} --master_port=9292 train.py \
-    --train_data {train_data} \
-    {_arg_if_present(eval_data, 'eval_data')} \
-    {_arg_if_present(weights, 'weights')} \
-    --num_train_epochs {num_train_epochs} \
-    --learning_rate {learning_rate} \
-    --train_batch_size {train_batch_size} \
-    --gradient_accumulation_steps {gradient_accumulation_steps} \
-    --logging_steps {logging_steps} \
-    --warmup_ratio {warmup_ratio} \
-    --lr_scheduler_type {lr_scheduler_type} \
-    --max_steps {max_steps} 
-    """
-    res = os.system(dist_command)
-    if res > 0:
-        raise Exception(f"Distributed training failed w/exit code {res}")
-    return
-
-
 def train(
     train_data: Path = Input(
         description="path to data file to use for fine-tuning your model"
@@ -269,9 +207,8 @@ def train(
     ),
     local_output_dir: str = None,
     deepspeed: str = None,
-    local_rank: int = -1
-) -> TrainingOutput:
-
+    local_rank: int = -1,
+) -> None:
     print("Loading model...")
 
     # if peft:
@@ -310,11 +247,9 @@ def train(
             tf32=True,
             bf16=True,
             half_precision_backend="cuda_amp",
-            local_rank=local_rank
+            local_rank=local_rank,
         ),
-        data_collator=CustomDataCollatorSeq2Seq(
-            tokenizer, 8
-        ),  # depends on bf16 value
+        data_collator=CustomDataCollatorSeq2Seq(tokenizer, 8),  # depends on bf16 value
     )
     trainer.train()
     trainer.save_model(output_dir=local_output_dir)
@@ -377,15 +312,23 @@ if __name__ == "__main__":
         type=str,
         default="cosine",
     )
-    parser.add_argument("--deepspeed", type=str, default=None, help="Path to deepspeed config file.")
-    parser.add_argument("--local_output_dir", type=str, help="Write directly to this local path", required=True)
-    parser.add_argument("--local_rank",
+    parser.add_argument(
+        "--deepspeed", type=str, default=None, help="Path to deepspeed config file."
+    )
+    parser.add_argument(
+        "--local_output_dir",
+        type=str,
+        help="Write directly to this local path",
+        required=True,
+    )
+    parser.add_argument(
+        "--local_rank",
         type=int,
         default=-1,
-        help="Provided by deepspeed to identify which instance this process is when performing multi-GPU training.")
+        help="Provided by deepspeed to identify which instance this process is when performing multi-GPU training.",
+    )
     some_args = parser.parse_args()
     train(**vars(some_args))
-
 
     # parser.add_argument(
     #     "--local_rank",

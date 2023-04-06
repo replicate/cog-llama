@@ -6,7 +6,7 @@ from typing import Optional
 import torch
 from cog import BaseModel, Input, Path
 from tensorizer import TensorSerializer
-from transformers import T5ForConditionalGeneration 
+from transformers import T5ForConditionalGeneration
 
 from config import HUGGINGFACE_MODEL_NAME
 
@@ -93,8 +93,9 @@ def train(
         if var:
             return f"--{var_name} {var}"
         return " "
-    
-    call("deepspeed "
+
+    call(
+        "deepspeed "
         + num_gpus_flag
         + " --module training.trainer --deepspeed "
         + deepspeed_config
@@ -102,26 +103,27 @@ def train(
         + f" --weights={input_model}"
         + f" --num_train_epochs={num_train_epochs}"
         + f" --max_steps={max_steps}"
-        + _arg_if_present(eval_data, 'eval_data') 
-        + f" --learning_rate {learning_rate}" 
-        + f" --train_batch_size {train_batch_size}" 
-        + f" --gradient_accumulation_steps {gradient_accumulation_steps}" 
-        + f" --logging_steps {logging_steps}" 
-        + f" --warmup_ratio {warmup_ratio}" 
-        + f" --lr_scheduler_type {lr_scheduler_type}" 
+        + _arg_if_present(eval_data, "eval_data")
+        + f" --learning_rate {learning_rate}"
+        + f" --train_batch_size {train_batch_size}"
+        + f" --gradient_accumulation_steps {gradient_accumulation_steps}"
+        + f" --logging_steps {logging_steps}"
+        + f" --warmup_ratio {warmup_ratio}"
+        + f" --lr_scheduler_type {lr_scheduler_type}"
         + " --local_output_dir "
-        + output_dir, shell=True)
+        + output_dir,
+        shell=True,
+    )
 
     if os.path.exists(MODEL_OUT):
         os.remove(MODEL_OUT)
 
-    model = T5ForConditionalGeneration.from_pretrained(output_dir).to('cuda')
+    model = T5ForConditionalGeneration.from_pretrained(output_dir).to("cuda")
     serializer = TensorSerializer(MODEL_OUT)
     serializer.write_module(model)
     serializer.close()
 
     return TrainingOutput(weights=Path(MODEL_OUT))
-
 
 
 if __name__ == "__main__":
