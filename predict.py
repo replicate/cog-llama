@@ -20,7 +20,7 @@ class Predictor(BasePredictor):
             # bugfix
             weights = None
         if weights is None:
-            self.model = self.load_huggingface_model(weights=DEFAULT_MODEL_NAME)
+            self.model = self.load_tensorizer(weights=DEFAULT_MODEL_NAME)
         elif hasattr(weights, "filename") and "tensors" in weights.filename:
             self.model = self.load_tensorizer(weights)
         elif hasattr(weights, "suffix") and "tensors" in weights.suffix:
