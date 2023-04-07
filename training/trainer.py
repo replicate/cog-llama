@@ -1,4 +1,5 @@
 import argparse
+import copy
 import json
 
 import torch
@@ -6,14 +7,15 @@ from cog import Input, Path
 from peft import (LoraConfig, TaskType, get_peft_model,
                   prepare_model_for_int8_training)
 from torch.utils.data import Dataset
-from transformers import T5ForConditionalGeneration, Trainer, TrainingArguments
+from transformers import LlamaForCausalLM, Trainer, TrainingArguments
 
-from config import HUGGINGFACE_MODEL_NAME, load_tokenizer
+from config import DEFAULT_MODEL_NAME, load_tokenizer
 
 MODEL_OUT = "/src/tuned_weights.tensors"
 CHECKPOINT_DIR = "checkpoints"
 SAVE_STRATEGY = "epoch"
 DIST_OUT_DIR = "tmp/model"
+IGNORE_INDEX = -100
 
 
 class DatasetBuilder:
@@ -40,6 +42,30 @@ class DatasetBuilder:
         return TuneDataset(tokenized_input_ids, tokenized_labels)
 
 
+class CausalDatasetBuilder(DatasetBuilder):
+    """Builds generative dataset for Causal LM."""
+
+    def __init__(self, tokenizer, train_on_prompt=True):
+        super().__init__(tokenizer)
+        self.train_on_prompt = train_on_prompt
+
+    def construct_dataset(self, input_data):
+        labels = [val["prompt"] + "\n" + val["completion"] for val in input_data]
+        input_ids = [val.squeeze() for val in self.batch_tokenize(labels)]
+        labels = copy.deepcopy(input_ids)
+        if self.train_on_prompt:
+            return TuneDataset(input_ids, labels)
+        # masking prompt
+        prompts = [val["prompt"] for val in input_data]
+        tokenized_prompts = self.batch_tokenize(prompts)
+        prompt_lens = [val.shape[1] for val in tokenized_prompts]
+
+        for label, source_len in zip(labels, prompt_lens):
+            label[:source_len] = IGNORE_INDEX
+        return TuneDataset(input_ids, labels)
+
+
+
 class TuneDataset(Dataset):
     """Dead simple torch dataset wrapper. Attention masks are created in collator"""
 
@@ -54,7 +80,7 @@ class TuneDataset(Dataset):
         return dict(input_ids=self.input_ids[i], labels=self.labels[i])
 
 
-class CustomDataCollatorSeq2Seq:
+class SequenceDataCollator:
     """Collate examples for dynamic batch construction in supervised fine-tuning."""
 
     def __init__(self, tokenizer, multiple_of=None):
@@ -71,7 +97,7 @@ class CustomDataCollatorSeq2Seq:
 
     def __call__(self, instances):
         input_ids, labels = tuple(
-            [instance[key][0] for instance in instances]
+            [instance[key] for instance in instances]
             for key in ("input_ids", "labels")
         )
         if self.multiple_of:
@@ -124,9 +150,9 @@ def load_json(path):
 
 def load_model(model_name_or_path):
     if model_name_or_path is None:
-        model_name_or_path = HUGGINGFACE_MODEL_NAME
-    model = T5ForConditionalGeneration.from_pretrained(
-        model_name_or_path, cache_dir="pretrained_weights"
+        model_name_or_path = DEFAULT_MODEL_NAME
+    model = LlamaForCausalLM.from_pretrained(
+        model_name_or_path, cache_dir="pretrained_weights", torch_dtype=torch.float16
     )
 
     return model
@@ -136,8 +162,8 @@ def load_peft_model(
     model_name_or_path, lora_rank: int, lora_alpha: int, lora_dropout: float
 ):
     if model_name_or_path is None:
-        model_name_or_path = HUGGINGFACE_MODEL_NAME
-    model = T5ForConditionalGeneration.from_pretrained(
+        model_name_or_path = DEFAULT_MODEL_NAME
+    model = LlamaForCausalLM.from_pretrained(
         model_name_or_path,
         cache_dir="pretrained_weights",
         torch_dtype=torch.float16,
@@ -220,7 +246,7 @@ def train(
     print(f"Loading dataset {train_data}...")
     print(train_data)
     train_data = load_data(train_data)
-    p = DatasetBuilder(tokenizer)
+    p = CausalDatasetBuilder(tokenizer)
     train_dataset = p.construct_dataset(train_data)
     eval_dataset = None
     if eval_data:
@@ -249,7 +275,7 @@ def train(
             half_precision_backend="cuda_amp",
             local_rank=local_rank,
         ),
-        data_collator=CustomDataCollatorSeq2Seq(tokenizer, 8),  # depends on bf16 value
+        data_collator=SequenceDataCollator(tokenizer, 8),  # depends on bf16 value
     )
     trainer.train()
     trainer.save_model(output_dir=local_output_dir)

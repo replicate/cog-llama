@@ -6,9 +6,9 @@ from typing import Optional
 import torch
 from cog import BaseModel, Input, Path
 from tensorizer import TensorSerializer
-from transformers import T5ForConditionalGeneration
+from transformers import LlamaForCausalLM
 
-from config import HUGGINGFACE_MODEL_NAME
+from config import DEFAULT_MODEL_NAME
 
 MODEL_OUT = "/src/tuned_weights.tensors"
 CHECKPOINT_DIR = "checkpoints"
@@ -64,13 +64,12 @@ def train(
     max_steps: int = Input(
         description="number of steps to run training for, supersedes num_train_epochs",
         default=-1,
-        ge=0,
     ),
     logging_steps: int = Input(
         description="number of steps between logging epoch & loss", default=1
     ),
 ) -> TrainingOutput:
-    input_model = weights if weights is not None else HUGGINGFACE_MODEL_NAME
+    input_model = weights if weights is not None else DEFAULT_MODEL_NAME
 
     root_path = os.getcwd()
     deepspeed_config = os.path.join(root_path, "ds_config/ds_z3_bf16_config.json")
@@ -111,14 +110,14 @@ def train(
         + f" --warmup_ratio {warmup_ratio}"
         + f" --lr_scheduler_type {lr_scheduler_type}"
         + " --local_output_dir "
-        + output_dir,
+        + DIST_OUT_DIR,
         shell=True,
     )
 
     if os.path.exists(MODEL_OUT):
         os.remove(MODEL_OUT)
 
-    model = T5ForConditionalGeneration.from_pretrained(output_dir).to("cuda")
+    model = LlamaForCausalLM.from_pretrained(DIST_OUT_DIR).to("cuda")
     serializer = TensorSerializer(MODEL_OUT)
     serializer.write_module(model)
     serializer.close()

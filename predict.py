@@ -10,18 +10,19 @@ from tensorizer.utils import no_init_or_tensor
 from transformers import (AutoConfig, AutoModelForSeq2SeqLM,
                           T5ForConditionalGeneration)
 
-from config import HUGGINGFACE_MODEL_NAME, load_tokenizer
-from subclass import YieldingT5
+from config import DEFAULT_MODEL_NAME, CONFIG_LOCATION, load_tokenizer
+from subclass import YieldingLlama
 
 
 class Predictor(BasePredictor):
     def setup(self, weights: Optional[Path] = None):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        weights = Path("/src/tuned_weights.tensors")
         if weights is not None and weights.name == "weights":
             # bugfix
             weights = None
         if weights is None:
-            self.model = self.load_huggingface_model(weights=HUGGINGFACE_MODEL_NAME)
+            self.model = self.load_huggingface_model(weights=DEFAULT_MODEL_NAME)
         elif hasattr(weights, "filename") and "tensors" in weights.filename:
             self.model = self.load_tensorizer(weights)
         elif hasattr(weights, "suffix") and "tensors" in weights.suffix:
@@ -34,7 +35,7 @@ class Predictor(BasePredictor):
     def load_huggingface_model(self, weights=None):
         st = time.time()
         print(f"loading weights from {weights} w/o tensorizer")
-        model = YieldingT5.from_pretrained(
+        model = YieldingLlama.from_pretrained(
             weights, cache_dir="pretrained_weights", torch_dtype=torch.float16
         )
         model.to(self.device)
@@ -44,10 +45,10 @@ class Predictor(BasePredictor):
     def load_tensorizer(self, weights):
         st = time.time()
         print(f"deserializing weights from {weights}")
-        config = AutoConfig.from_pretrained(HUGGINGFACE_MODEL_NAME)
+        config = AutoConfig.from_pretrained(CONFIG_LOCATION)
 
         model = no_init_or_tensor(
-            lambda: YieldingT5.from_pretrained(
+            lambda: YieldingLlama.from_pretrained(
                 None, config=config, state_dict=OrderedDict()
             )
         )
@@ -154,6 +155,6 @@ class EightBitPredictor(Predictor):
         # TODO: fine-tuned 8bit weights.
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = T5ForConditionalGeneration.from_pretrained(
-            HUGGINGFACE_MODEL_NAME, load_in_8bit=True, device_map="auto"
+            DEFAULT_MODEL_NAME, load_in_8bit=True, device_map="auto"
         )
         self.tokenizer = load_tokenizer()
