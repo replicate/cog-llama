@@ -36,21 +36,8 @@ def train(
         description="number of training steps to update gradient for before performing a backward pass",
         default=8,
     ),
-    lr_scheduler_type: str = Input(
-        description="learning rate scheduler",
-        default="cosine",
-        choices=[
-            "linear",
-            "cosine",
-            "cosine_with_restarts",
-            "polynomial",
-            "inverse_sqrt",
-            "constant",
-            "constant_with_warmup",
-        ],
-    ),
     learning_rate: float = Input(
-        description="learning rate, for learning!", default=2e-4, ge=0
+        description="learning rate, for learning!", default=2e-5, ge=0
     ),
     warmup_ratio: float = Input(
         description="pct of steps for a linear learning rate warmup",
@@ -108,7 +95,6 @@ def train(
         + f" --gradient_accumulation_steps {gradient_accumulation_steps}"
         + f" --logging_steps {logging_steps}"
         + f" --warmup_ratio {warmup_ratio}"
-        + f" --lr_scheduler_type {lr_scheduler_type}"
         + " --local_output_dir "
         + DIST_OUT_DIR,
         shell=True,
