@@ -117,7 +117,9 @@ def train(
     if os.path.exists(MODEL_OUT):
         os.remove(MODEL_OUT)
 
-    model = LlamaForCausalLM.from_pretrained(DIST_OUT_DIR).to("cuda")
+    model = LlamaForCausalLM.from_pretrained(
+        DIST_OUT_DIR, torch_dtype=torch.float16
+    ).to("cuda")
     serializer = TensorSerializer(MODEL_OUT)
     serializer.write_module(model)
     serializer.close()

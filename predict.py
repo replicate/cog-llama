@@ -1,14 +1,13 @@
 import os
 import time
 from collections import OrderedDict
-from typing import Any, List, Optional
+from typing import Optional
 
 import torch
 from cog import BasePredictor, ConcatenateIterator, Input, Path
 from tensorizer import TensorDeserializer
 from tensorizer.utils import no_init_or_tensor
-from transformers import (AutoConfig, AutoModelForSeq2SeqLM,
-                          T5ForConditionalGeneration)
+from transformers import AutoConfig
 
 from config import DEFAULT_MODEL_NAME, CONFIG_LOCATION, load_tokenizer
 from subclass import YieldingLlama
@@ -17,7 +16,6 @@ from subclass import YieldingLlama
 class Predictor(BasePredictor):
     def setup(self, weights: Optional[Path] = None):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        weights = Path("/src/tuned_weights.tensors")
         if weights is not None and weights.name == "weights":
             # bugfix
             weights = None
@@ -26,6 +24,8 @@ class Predictor(BasePredictor):
         elif hasattr(weights, "filename") and "tensors" in weights.filename:
             self.model = self.load_tensorizer(weights)
         elif hasattr(weights, "suffix") and "tensors" in weights.suffix:
+            self.model = self.load_tensorizer(weights)
+        elif "tensors" in weights:
             self.model = self.load_tensorizer(weights)
         else:
             self.model = self.load_huggingface_model(weights=weights)
@@ -49,7 +49,7 @@ class Predictor(BasePredictor):
 
         model = no_init_or_tensor(
             lambda: YieldingLlama.from_pretrained(
-                None, config=config, state_dict=OrderedDict()
+                None, config=config, state_dict=OrderedDict(), torch_dtype=torch.float16
             )
         )
         des = TensorDeserializer(weights, plaid_mode=True)
@@ -59,11 +59,11 @@ class Predictor(BasePredictor):
 
     def predict(
         self,
-        prompt: str = Input(description=f"Prompt to send to FLAN-T5."),
+        prompt: str = Input(description=f"Prompt to send to Llama."),
         max_length: int = Input(
             description="Maximum number of tokens to generate. A word is generally 2-3 tokens",
             ge=1,
-            default=50,
+            default=500,
         ),
         temperature: float = Input(
             description="Adjusts randomness of outputs, greater than 1 is random and 0 is deterministic, 0.75 is a good starting value.",
@@ -154,7 +154,7 @@ class EightBitPredictor(Predictor):
             weights = None
         # TODO: fine-tuned 8bit weights.
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.model = T5ForConditionalGeneration.from_pretrained(
+        self.model = YieldingLlama.from_pretrained(
             DEFAULT_MODEL_NAME, load_in_8bit=True, device_map="auto"
         )
         self.tokenizer = load_tokenizer()
