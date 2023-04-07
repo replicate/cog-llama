@@ -31,7 +31,7 @@ def train(
     weights: Path = Input(
         description="location of weights that are going to be fine-tuned", default=None
     ),
-    train_batch_size: int = Input(description="batch size per GPU", default=8, ge=1),
+    train_batch_size: int = Input(description="batch size per GPU", default=4, ge=1),
     gradient_accumulation_steps: int = Input(
         description="number of training steps to update gradient for before performing a backward pass",
         default=8,
