@@ -80,7 +80,7 @@ def train(
             return f"--{var_name} {var}"
         return " "
 
-    call(
+    res = call(
         "deepspeed "
         + num_gpus_flag
         + " --module training.trainer --deepspeed "
@@ -99,6 +99,8 @@ def train(
         + DIST_OUT_DIR,
         shell=True,
     )
+    if res != 0:
+        raise Exception(f"Training failed! Process returned error code {res}. Check the logs for details.")
 
     if os.path.exists(MODEL_OUT):
         os.remove(MODEL_OUT)

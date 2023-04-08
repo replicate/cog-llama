@@ -3,6 +3,7 @@ import copy
 import json
 import os
 import time
+import logging
 from collections import OrderedDict
 
 import torch
@@ -55,7 +56,7 @@ class CausalDatasetBuilder(DatasetBuilder):
         self.train_on_prompt = train_on_prompt
 
     def construct_dataset(self, input_data):
-        labels = [val["prompt"] + "\n" + val["completion"] for val in input_data]
+        labels = [val["prompt"] + "\n" + val["completion"] + self.tokenizer.eos_token for val in input_data]
         input_ids = [val.squeeze() for val in self.batch_tokenize(labels)]
         labels = copy.deepcopy(input_ids)
         if self.train_on_prompt:
