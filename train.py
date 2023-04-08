@@ -1,7 +1,10 @@
 import argparse
 import os
+import shutil
 from subprocess import call
 import logging
+from typing import Optional
+from zipfile import ZipFile
 
 import torch
 from cog import BaseModel, Input, Path
@@ -55,6 +58,11 @@ def train(
     logging_steps: int = Input(
         description="number of steps between logging epoch & loss", default=1
     ),
+    lora_rank: int = Input(
+        description="Rank of the lora matrices", default=8, ge=1),
+    lora_alpha: int = Input(description="Alpha parameter for scaling lora weights; weigts are scaled by alpha/rank", default=16, ge=1),
+    lora_dropout: float = Input(description="Dropout for lora training", default=0.1, ge=0.0, le=1.0),
+    lora_target_modules: str = Input(description="Comma-separated list of lora modules to target, i.e. 'q_proj,v_proj'. Leave blank for default.", default=None)
 ) -> TrainingOutput:
     input_model = weights if weights is not None else DEFAULT_MODEL_NAME
 
@@ -62,10 +70,12 @@ def train(
     deepspeed_config = os.path.join(root_path, "ds_config/ds_z3_bf16_config.json")
 
     output_dir = DIST_OUT_DIR
-    os.makedirs(output_dir, exist_ok=True)
+    if os.path.exists(output_dir):
+        shutil.rmtree(output_dir)
+    os.makedirs(output_dir)
 
     num_gpus = torch.cuda.device_count()
-    num_gpus_flag = f"--num_gpus={num_gpus}"
+    num_gpus_flag = f"--nproc_per_node={num_gpus}"
 
     print(f"Local Output Dir: {output_dir}")
     print(f"Number of GPUs: {num_gpus}")
@@ -73,18 +83,17 @@ def train(
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     os.environ["HF_DATASETS_CACHE"] = "/src/.hf-cache"
 
-    # TODO: use deepspeed's python api instead of subprocessing
     def _arg_if_present(var, var_name):
         """Need to wrap any arguments whose default value in train() is `None`"""
         if var:
-            return f"--{var_name} {var}"
+            return f" --{var_name} {var}"
         return " "
 
     res = call(
-        "deepspeed "
+        "torchrun "
         + num_gpus_flag
-        + " --module training.trainer --deepspeed "
-        + deepspeed_config
+        + " --master_port=9292"
+        + " training/trainer.py"
         + f" --train_data={str(train_data)}"
         + f" --weights={input_model}"
         + f" --num_train_epochs={num_train_epochs}"
@@ -95,27 +104,26 @@ def train(
         + f" --gradient_accumulation_steps {gradient_accumulation_steps}"
         + f" --logging_steps {logging_steps}"
         + f" --warmup_ratio {warmup_ratio}"
+        + f" --lora_rank {lora_rank}"
+        + f" --lora_alpha {lora_alpha}"
+        + f" --lora_dropout {lora_dropout}"
+        + _arg_if_present(lora_target_modules, "lora_target_modules")
         + " --local_output_dir "
-        + DIST_OUT_DIR,
+        + output_dir,
         shell=True,
     )
     if res != 0:
-        raise Exception(
-            f"Training failed! Process returned error code {res}. Check the logs for details."
-        )
+        raise Exception(f"Training failed! Process returned error code {res}. Check the logs for details.")
+    
+    out_path = "training_output.zip"
 
-    if os.path.exists(MODEL_OUT):
-        os.remove(MODEL_OUT)
+    directory = Path(output_dir)
+    with ZipFile(out_path, "w") as zip:
+        for file_path in directory.rglob("*"):
+            print(file_path)
+            zip.write(file_path, arcname=file_path.relative_to(directory))
 
-    logging.disable(logging.WARN)
-    model = LlamaForCausalLM.from_pretrained(DIST_OUT_DIR, torch_dtype=torch.float16)
-    logging.disable(logging.NOTSET)
-
-    serializer = TensorSerializer(MODEL_OUT)
-    serializer.write_module(model)
-    serializer.close()
-
-    return TrainingOutput(weights=Path(MODEL_OUT))
+    return TrainingOutput(weights=Path(out_path))
 
 
 if __name__ == "__main__":
@@ -169,10 +177,5 @@ if __name__ == "__main__":
         help="Number of training steps to run, overrides num_train_epochs, useful for testing",
     )
     parser.add_argument("--logging_steps", type=int, default=1)
-    parser.add_argument(
-        "--lr_scheduler_type",
-        type=str,
-        default="cosine",
-    )
     some_args = parser.parse_args()
     train(**vars(some_args))

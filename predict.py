@@ -1,5 +1,6 @@
 import time
 from typing import Optional
+import zipfile
 
 import torch
 from cog import BasePredictor, ConcatenateIterator, Input, Path
@@ -15,25 +16,31 @@ class Predictor(BasePredictor):
             # bugfix
             weights = None
         if weights is None:
-            self.model = load_tensorizer(
-                weights=DEFAULT_MODEL_NAME, plaid_mode=True, cls=YieldingLlama
-            )
-        elif hasattr(weights, "filename") and "tensors" in weights.filename:
-            self.model = load_tensorizer(
-                weights=weights, plaid_mode=True, cls=YieldingLlama
-            )
-        elif hasattr(weights, "suffix") and "tensors" in weights.suffix:
-            self.model = load_tensorizer(
-                weights=weights, plaid_mode=True, cls=YieldingLlama
-            )
-        elif "tensors" in weights:
-            self.model = load_tensorizer(
-                weights=weights, plaid_mode=True, cls=YieldingLlama
-            )
+            self.model = self.load_tensorizer(weights=DEFAULT_MODEL_NAME)
+
+        weights = str(weights)
+        if '.zip' in weights:
+            self.model = self.load_peft(weights)
+        if "tensors" in weights:
+            self.model = self.load_tensorizer(weights)
         else:
             self.model = self.load_huggingface_model(weights=weights)
 
         self.tokenizer = load_tokenizer()
+
+    def load_peft(self, weights):
+        if 'tensors' in DEFAULT_MODEL_NAME:
+            model = self.load_tensorizer(DEFAULT_MODEL_NAME)
+        else:
+            model = self.load_huggingface_model(DEFAULT_MODEL_NAME)
+        if 'https' in weights: # weights are in the cloud
+            # TODO: pull zip file locally
+            weights = 'local_file.zip'
+        out = 'peft_dir'
+        with zipfile.ZipFile(weights, 'r') as zip_ref:
+            zip_ref.extractall(out)
+        model = PeftModel.from_pretrained(model, out)
+        return model
 
     def load_huggingface_model(self, weights=None):
         st = time.time()
