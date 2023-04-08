@@ -65,7 +65,15 @@ def train(
     os.makedirs(output_dir, exist_ok=True)
 
     num_gpus = torch.cuda.device_count()
-    num_gpus_flag = f"--num_gpus={num_gpus}"
+    num_gpus_flag = f"--nproc_per_node={num_gpus}"
+
+    fsdp = None
+    fsdp_tlayer = None
+    if num_gpus > 1:
+        fsdp = "full_shardSEPauto_wrap"
+        fsdp_tlayer='LlamaDecoderLayer'
+
+        
 
     print(f"Local Output Dir: {output_dir}")
     print(f"Number of GPUs: {num_gpus}")
@@ -77,14 +85,14 @@ def train(
     def _arg_if_present(var, var_name):
         """Need to wrap any arguments whose default value in train() is `None`"""
         if var:
-            return f"--{var_name} {var}"
+            return f" --{var_name} {var}"
         return " "
 
     res = call(
-        "deepspeed "
+        "torchrun "
         + num_gpus_flag
-        + " --module training.trainer --deepspeed "
-        + deepspeed_config
+        + " --master_port=9292"
+        + " trainer.py"
         + f" --train_data={str(train_data)}"
         + f" --weights={input_model}"
         + f" --num_train_epochs={num_train_epochs}"
@@ -95,6 +103,8 @@ def train(
         + f" --gradient_accumulation_steps {gradient_accumulation_steps}"
         + f" --logging_steps {logging_steps}"
         + f" --warmup_ratio {warmup_ratio}"
+        + _arg_if_present(fsdp, "fsdp")
+        + _arg_if_present(fsdp_tlayer, "fsdp_transformer_layer_cls_to_wrap")
         + " --local_output_dir "
         + DIST_OUT_DIR,
         shell=True,

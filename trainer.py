@@ -256,6 +256,8 @@ def train(
     local_output_dir: str = None,
     deepspeed: str = None,
     local_rank: int = -1,
+    fsdp: str = "",
+    fsdp_transformer_layer_cls_to_wrap = None
 ) -> None:
     print("Loading model...")
 
@@ -276,6 +278,12 @@ def train(
         eval_dataset = p.construct_dataset(eval_data)
     torch.cuda.empty_cache()
 
+    if len(fsdp) > 1:
+        fsdp = ' '.join(fsdp.split("SEP"))
+        # need to do this for this fun exciting fdsp + tensorizer combo
+        print(f"model device: {model.device}, current device {torch.cuda.current_device()}, rank: {os.environ['RANK']}")
+        model = model.to(f"cuda:{os.environ['RANK']}")
+
     print("Training...")
     trainer = Trainer(
         model=model,
@@ -291,12 +299,12 @@ def train(
             warmup_ratio=warmup_ratio,
             num_train_epochs=num_train_epochs,
             learning_rate=learning_rate,
-            deepspeed=deepspeed,
             max_steps=max_steps,
             tf32=True,
             bf16=True,
+            fsdp=fsdp,
+            fsdp_transformer_layer_cls_to_wrap=fsdp_transformer_layer_cls_to_wrap,
             half_precision_backend="cuda_amp",
-            local_rank=local_rank,
         ),
         data_collator=SequenceDataCollator(tokenizer, 8),  # depends on bf16 value
     )
@@ -376,6 +384,18 @@ if __name__ == "__main__":
         default=-1,
         help="Provided by deepspeed to identify which instance this process is when performing multi-GPU training.",
     )
+    parser.add_argument(
+        "--fsdp",
+        type=str,
+        default="",
+        help="fsdp config if fsdp",
+    )    
+    parser.add_argument(
+        "--fsdp_transformer_layer_cls_to_wrap",
+        type=str,
+        default=None,
+        help="Xformer layer class to wrap for fsdp",
+    )    
     some_args = parser.parse_args()
     train(**vars(some_args))
 
