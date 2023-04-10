@@ -13,7 +13,6 @@ build:
   python_packages:
     - "numpy==1.24.2"
     - "torch==1.13.1"
-    - "transformers==4.27.4"
     - "accelerate==0.18.0"
     - "peft==0.2.0"
     - "sentencepiece==0.1.97"
@@ -21,6 +20,9 @@ build:
     - "jinja2==3.1.2"
     - "deepspeed==0.8.3"
     {{extra_deps}}
+
+  run: 
+    - "pip install git+https://github.com/huggingface/transformers.git@786092a35e18154cacad62c30fe92bac2c27a1e1"
 
 # predict.py defines how predictions are run on your model
 predict: "{{predictor}}"
