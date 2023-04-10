@@ -3,32 +3,16 @@ import os
 import stat
 from jinja2 import Template
 
-# Flan configs, can modify as 
+# llama configs, can modify as needed. 
 CONFIGS = {
-    "flan-t5-small": {
+    "llama-7b": {
         "cog_yaml_parameters": {"predictor":"predict.py:Predictor"},
-        "config_py_parameters": {"model_name": "google/flan-t5-small"}
+        "config_py_parameters": {"model_name": "weights/llama-7b"}
     },
-    "flan-t5-base": {
+    "llama-13b": {
         "cog_yaml_parameters": {"predictor":"predict.py:Predictor"},
-        "config_py_parameters": {"model_name": "google/flan-t5-base"}
+        "config_py_parameters": {"model_name": "weights/llama-7b"}
     },
-    "flan-t5-large": {
-        "cog_yaml_parameters": {"predictor":"predict.py:Predictor"},
-        "config_py_parameters": {"model_name": "google/flan-t5-large"}
-    },
-    "flan-t5-xl": {
-        "cog_yaml_parameters": {"predictor":"predict.py:Predictor"},
-        "config_py_parameters": {"model_name": "google/flan-t5-xl"}
-    },
-    "flan-t5-xxl": {
-        "cog_yaml_parameters": {"predictor":"predict.py:Predictor"},
-        "config_py_parameters": {"model_name": "google/flan-t5-xxl"}
-    },
-    "flan-ul2": {
-        "cog_yaml_parameters": {"predictor":"predict.py:EightBitPredictor", "extra_deps":'''- "bitsandbytes==0.37.2"'''},
-        "config_py_parameters": {"model_name": "google/flan-ul2"}
-    }
 }
 
 def _reset_file(file_path):

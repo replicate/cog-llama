@@ -1,10 +1,25 @@
-from transformers import T5Tokenizer
+from transformers import LlamaTokenizer
 
-HUGGINGFACE_MODEL_NAME = "{{model_name}}"
+DEFAULT_MODEL_NAME = "{{model_name}}" # path from which we pull weights when there's no COG_WEIGHTS environment variable
+TOKENIZER_NAME = "weights/tokenizer"
+CONFIG_LOCATION = "{{model_name}}"
+
+DEFAULT_PAD_TOKEN = "[PAD]"
+DEFAULT_EOS_TOKEN = "</s>"
+DEFAULT_BOS_TOKEN = "</s>"
+DEFAULT_UNK_TOKEN = "</s>"
 
 
 def load_tokenizer():
     """Same tokenizer, agnostic from tensorized weights/etc"""
-    return T5Tokenizer.from_pretrained(
-        HUGGINGFACE_MODEL_NAME, cache_dir="pretrained_weights"
+    tok = LlamaTokenizer.from_pretrained(
+        TOKENIZER_NAME, cache_dir="pretrained_weights"
     )
+    tok.add_special_tokens(
+    {
+        "eos_token": DEFAULT_EOS_TOKEN,
+        "bos_token": DEFAULT_BOS_TOKEN,
+        "unk_token": DEFAULT_UNK_TOKEN,
+        "pad_token": DEFAULT_PAD_TOKEN
+    })
+    return tok
