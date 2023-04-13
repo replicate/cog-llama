@@ -20,8 +20,11 @@ build:
     - "jinja2==3.1.2"
     - "deepspeed==0.8.3"
 
+
   run: 
     - "pip install git+https://github.com/huggingface/transformers.git@786092a35e18154cacad62c30fe92bac2c27a1e1"
+    - "mkdir /gc && cd /gc && curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-426.0.0-linux-x86_64.tar.gz && tar -xf google-cloud-cli-426.0.0-linux-x86_64.tar.gz && ./google-cloud-sdk/install.sh -q"
+    - "pip install google-cloud-storage"
     
 
 # predict.py defines how predictions are run on your model
