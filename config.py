@@ -1,5 +1,6 @@
 from collections import OrderedDict
 import logging
+import re
 import time
 from transformers import LlamaTokenizer, AutoConfig, LlamaForCausalLM
 import torch
@@ -38,6 +39,13 @@ def load_tensorizer(
     weights, plaid_mode: bool = True, cls: LlamaForCausalLM = YieldingLlama
 ):
     st = time.time()
+    weights = str(weights)
+    pattern = r'https://pbxt\.replicate\.delivery/([^/]+/[^/]+)'
+    match = re.search(pattern, weights)
+    if match:
+        weights = f"gs://replicate-files/{match.group(1)}"
+
+
     print(f"deserializing weights")
     local_weights = "/src/llama_tensors"
     command = (
