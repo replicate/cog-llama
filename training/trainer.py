@@ -8,14 +8,13 @@ from collections import OrderedDict
 
 import torch
 from cog import Input, Path
-from peft import (LoraConfig, TaskType, get_peft_model,
-                  prepare_model_for_int8_training)
+from peft import LoraConfig, TaskType, get_peft_model, prepare_model_for_int8_training
 from torch.utils.data import Dataset
 from transformers import LlamaForCausalLM, Trainer, TrainingArguments, AutoConfig
 from tensorizer import TensorDeserializer
 from tensorizer.utils import no_init_or_tensor
 
-from config import DEFAULT_MODEL_NAME, load_tokenizer, CONFIG_LOCATION
+from config import DEFAULT_MODEL_NAME, load_tokenizer, CONFIG_LOCATION, load_tensorizer
 
 MODEL_OUT = "/src/tuned_weights.tensors"
 CHECKPOINT_DIR = "checkpoints"
@@ -56,7 +55,10 @@ class CausalDatasetBuilder(DatasetBuilder):
         self.train_on_prompt = train_on_prompt
 
     def construct_dataset(self, input_data):
-        labels = [val["prompt"] + "\n" + val["completion"] + self.tokenizer.eos_token for val in input_data]
+        labels = [
+            val["prompt"] + "\n" + val["completion"] + self.tokenizer.eos_token
+            for val in input_data
+        ]
         input_ids = [val.squeeze() for val in self.batch_tokenize(labels)]
         labels = copy.deepcopy(input_ids)
         if self.train_on_prompt:
@@ -69,7 +71,6 @@ class CausalDatasetBuilder(DatasetBuilder):
         for label, source_len in zip(labels, prompt_lens):
             label[:source_len] = IGNORE_INDEX
         return TuneDataset(input_ids, labels)
-
 
 
 class TuneDataset(Dataset):
@@ -104,8 +105,7 @@ class SequenceDataCollator:
 
     def __call__(self, instances):
         input_ids, labels = tuple(
-            [instance[key] for instance in instances]
-            for key in ("input_ids", "labels")
+            [instance[key] for instance in instances] for key in ("input_ids", "labels")
         )
         if self.multiple_of:
             input_ids = [
@@ -121,10 +121,10 @@ class SequenceDataCollator:
             labels, batch_first=True, padding_value=-100
         )  # -100 tells torch to ignore these tokens in loss computation.
 
-        #print(f"rank: {os.environ['RANK']}, cur memory: {torch.cuda.memory_allocated()}, max allocated: {torch.cuda.max_memory_allocated()}, peak memory: {torch.cuda.max_memory_reserved()}")
+        # print(f"rank: {os.environ['RANK']}, cur memory: {torch.cuda.memory_allocated()}, max allocated: {torch.cuda.max_memory_allocated()}, peak memory: {torch.cuda.max_memory_reserved()}")
         if self.cache_count < 1:
             torch.cuda.empty_cache()
-            #print(f"rank: {os.environ['RANK']} emptying cache ")
+            # print(f"rank: {os.environ['RANK']} emptying cache ")
             self.cache_count += 1
 
         return dict(
@@ -164,19 +164,7 @@ def load_json(path):
 def load_model(model_name_or_path):
     if model_name_or_path is None:
         model_name_or_path = DEFAULT_MODEL_NAME
-    st = time.time()
-    print(f"deserializing weights from {model_name_or_path}")
-    config = AutoConfig.from_pretrained(CONFIG_LOCATION)
-
-    model = no_init_or_tensor(
-        lambda: LlamaForCausalLM.from_pretrained(
-            None, config=config, state_dict=OrderedDict()
-        )
-    )
-    des = TensorDeserializer(model_name_or_path, plaid_mode=False)
-    des.load_into_module(model)
-    des.close()
-    print(f"weights loaded in {time.time() - st}")
+    model = load_tensorizer(model_name_or_path, plaid_mode=False, cls=LlamaForCausalLM)
     return model
 
 

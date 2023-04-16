@@ -1,4 +1,7 @@
+import logging
 import os
+import subprocess
+from subprocess import DEVNULL
 import time
 from collections import OrderedDict
 from typing import Optional
@@ -9,7 +12,7 @@ from tensorizer import TensorDeserializer
 from tensorizer.utils import no_init_or_tensor
 from transformers import AutoConfig
 
-from config import DEFAULT_MODEL_NAME, CONFIG_LOCATION, load_tokenizer
+from config import DEFAULT_MODEL_NAME, CONFIG_LOCATION, load_tokenizer, load_tensorizer
 from subclass import YieldingLlama
 
 
@@ -20,13 +23,21 @@ class Predictor(BasePredictor):
             # bugfix
             weights = None
         if weights is None:
-            self.model = self.load_tensorizer(weights=DEFAULT_MODEL_NAME)
+            self.model = load_tensorizer(
+                weights=DEFAULT_MODEL_NAME, plaid_mode=True, cls=YieldingLlama
+            )
         elif hasattr(weights, "filename") and "tensors" in weights.filename:
-            self.model = self.load_tensorizer(weights)
+            self.model = load_tensorizer(
+                weights=weights, plaid_mode=True, cls=YieldingLlama
+            )
         elif hasattr(weights, "suffix") and "tensors" in weights.suffix:
-            self.model = self.load_tensorizer(weights)
+            self.model = load_tensorizer(
+                weights=weights, plaid_mode=True, cls=YieldingLlama
+            )
         elif "tensors" in weights:
-            self.model = self.load_tensorizer(weights)
+            self.model = load_tensorizer(
+                weights=weights, plaid_mode=True, cls=YieldingLlama
+            )
         else:
             self.model = self.load_huggingface_model(weights=weights)
 
@@ -39,21 +50,6 @@ class Predictor(BasePredictor):
             weights, cache_dir="pretrained_weights", torch_dtype=torch.float16
         )
         model.to(self.device)
-        print(f"weights loaded in {time.time() - st}")
-        return model
-
-    def load_tensorizer(self, weights):
-        st = time.time()
-        print(f"deserializing weights from {weights}")
-        config = AutoConfig.from_pretrained(CONFIG_LOCATION)
-
-        model = no_init_or_tensor(
-            lambda: YieldingLlama.from_pretrained(
-                None, config=config, state_dict=OrderedDict(), torch_dtype=torch.float16
-            )
-        )
-        des = TensorDeserializer(weights, plaid_mode=True)
-        des.load_into_module(model)
         print(f"weights loaded in {time.time() - st}")
         return model
 
@@ -132,7 +128,7 @@ class Predictor(BasePredictor):
                     continue
 
             # remove any special tokens such as </s>
-            token =  self.tokenizer.decode(prev_ids, skip_special_tokens=True)
+            token = self.tokenizer.decode(prev_ids, skip_special_tokens=True)
             if not first_token_yielded:
                 # no leading space for first token
                 token = token.strip()
