@@ -1,7 +1,7 @@
 import argparse
 import os
 from subprocess import call
-from typing import Optional
+import logging
 
 import torch
 from cog import BaseModel, Input, Path
@@ -100,14 +100,17 @@ def train(
         shell=True,
     )
     if res != 0:
-        raise Exception(f"Training failed! Process returned error code {res}. Check the logs for details.")
+        raise Exception(
+            f"Training failed! Process returned error code {res}. Check the logs for details."
+        )
 
     if os.path.exists(MODEL_OUT):
         os.remove(MODEL_OUT)
 
-    model = LlamaForCausalLM.from_pretrained(
-        DIST_OUT_DIR, torch_dtype=torch.float16
-    )
+    logging.disable(logging.WARN)
+    model = LlamaForCausalLM.from_pretrained(DIST_OUT_DIR, torch_dtype=torch.float16)
+    logging.disable(logging.NOTSET)
+
     serializer = TensorSerializer(MODEL_OUT)
     serializer.write_module(model)
     serializer.close()
