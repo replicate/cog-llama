@@ -5,6 +5,7 @@ import time
 from collections import OrderedDict
 from typing import Optional, List
 import io
+import subprocess
 
 
 import torch
@@ -25,11 +26,13 @@ DIST_OUT_DIR = "tmp/model"
 
 def test_cli_deserialization():
 
-    weights = "/src/best_tensors"
+    path = "path_to_weights"
+
     st = time.time()
     print("downloading weights")
     # don't love the whole /gc/google-cloud-sdk/bin/gcloud path but don't think there's an easy way to update PATH from cog, so might as well do this.
-    os.system("/gc/google-cloud-sdk/bin/gcloud storage cp gs://replicate-weights/tensorized_llama_7b.tensors /src/best_tensors")
+    weights = "/src/llama_tensors"
+    os.system(f"/gc/google-cloud-sdk/bin/gcloud storage cp {path} {weights}")
     print(f"weignts downloaded in {time.time() - st}")
     print(f"deserializing weights from {weights}")
     config = AutoConfig.from_pretrained(CONFIG_LOCATION)
@@ -42,6 +45,35 @@ def test_cli_deserialization():
     )
     logging.disable(logging.NOTSET)
     des = TensorDeserializer(weights, plaid_mode=False)
+    des.load_into_module(model)
+    print(f"zero to weights in {time.time() - st}")
+
+
+def test_in_memory_cli_deserialization():
+    """This is quite slow, turns out that gcloud storage streaming into memory (-) runs in series."""
+    path = "path/to/weights"
+    st = time.time()
+    print("downloading weights")
+    # don't love the whole /gc/google-cloud-sdk/bin/gcloud path but don't think there's an easy way to update PATH from cog, so might as well do this.
+    command = f"/gc/google-cloud-sdk/bin/gcloud storage cp {path} -".split()
+    result = subprocess.run(command, stdout=subprocess.PIPE, text=False)
+    if result.returncode != 0:
+        raise Exception(f"gcloud storage cp command failed with return code {result.returncode}: {result.stderr.decode('utf-8')}")
+
+    in_memory_file = io.BytesIO(result.stdout)
+    in_memory_file.seek(0)
+
+    print(f"weignts downloaded in {time.time() - st}")
+    config = AutoConfig.from_pretrained(CONFIG_LOCATION)
+
+    logging.disable(logging.WARN)
+    model = no_init_or_tensor(
+        lambda: YieldingLlama.from_pretrained(
+            None, config=config, state_dict=OrderedDict(), torch_dtype=torch.float16
+        )
+    )
+    logging.disable(logging.NOTSET)
+    des = TensorDeserializer(in_memory_file, plaid_mode=False)
     des.load_into_module(model)
     print(f"zero to weights in {time.time() - st}")
 
@@ -70,10 +102,14 @@ def download_blob_to_stream(bucket_name: str, source_blob_name: str, n: int = 4)
         split = int(size/n)
         start = 0
         end = split
-        for _ in range(n):
+
+        for i in range(n):
+            if i == n - 1:  # If it's the last partition
+                end = size - 1  # Set the endpoint to the last byte of the file
             partitions.append({"start": start, "end": end, "bucket": bucket, "blob": blob})
             start = end + 1
             end += split
+
         return partitions
     
     partitions = _partition_file(blob.size, bucket_name, source_blob_name, n)
@@ -99,10 +135,10 @@ def download_blob_to_stream(bucket_name: str, source_blob_name: str, n: int = 4)
 def test_python_deserialization():
     st = time.time()
     print("downloading weights")
-    bucket_name = "replicate-weights"
-    source_name = "tensorized_llama_7b.tensors"
+    bucket_name = "CHANGEME"
+    source_name = "CHANGEME"
 
-    obj = download_blob_to_stream(bucket_name=bucket_name, source_blob_name=source_name, n=12)
+    obj = download_blob_to_stream(bucket_name=bucket_name, source_blob_name=source_name, n=24)
 
     print(f"weignts downloaded in {time.time() - st}")
 
@@ -122,4 +158,5 @@ def test_python_deserialization():
 
 
 if __name__ == '__main__':
+    #test_python_deserialization()
     test_cli_deserialization()

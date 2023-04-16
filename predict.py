@@ -1,18 +1,10 @@
-import logging
-import os
-import subprocess
-from subprocess import DEVNULL
 import time
-from collections import OrderedDict
 from typing import Optional
 
 import torch
 from cog import BasePredictor, ConcatenateIterator, Input, Path
-from tensorizer import TensorDeserializer
-from tensorizer.utils import no_init_or_tensor
-from transformers import AutoConfig
 
-from config import DEFAULT_MODEL_NAME, CONFIG_LOCATION, load_tokenizer, load_tensorizer
+from config import DEFAULT_MODEL_NAME, load_tokenizer, load_tensorizer
 from subclass import YieldingLlama
 
 

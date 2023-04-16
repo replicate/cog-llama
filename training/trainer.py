@@ -1,20 +1,14 @@
 import argparse
 import copy
 import json
-import os
-import time
-import logging
-from collections import OrderedDict
 
 import torch
 from cog import Input, Path
 from peft import LoraConfig, TaskType, get_peft_model, prepare_model_for_int8_training
 from torch.utils.data import Dataset
-from transformers import LlamaForCausalLM, Trainer, TrainingArguments, AutoConfig
-from tensorizer import TensorDeserializer
-from tensorizer.utils import no_init_or_tensor
+from transformers import LlamaForCausalLM, Trainer, TrainingArguments
 
-from config import DEFAULT_MODEL_NAME, load_tokenizer, CONFIG_LOCATION, load_tensorizer
+from config import DEFAULT_MODEL_NAME, load_tokenizer, load_tensorizer
 
 MODEL_OUT = "/src/tuned_weights.tensors"
 CHECKPOINT_DIR = "checkpoints"

@@ -10,7 +10,7 @@ from tensorizer.utils import no_init_or_tensor
 
 from subclass import YieldingLlama
 
-DEFAULT_MODEL_NAME = "/src/llama_tensors" # path from which we pull weights when there's no COG_WEIGHTS environment variable
+DEFAULT_MODEL_NAME = "llama_weights/llama-7b"  # path from which we pull weights when there's no COG_WEIGHTS environment variable
 TOKENIZER_NAME = "llama_weights/tokenizer"
 CONFIG_LOCATION = "llama_weights/llama-7b"
 
