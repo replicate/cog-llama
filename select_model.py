@@ -38,13 +38,13 @@ def write_one_config(template_fpath: str, fname_out: str, config: dict):
 
 def write_configs(model_name):
     master_config = CONFIGS[model_name]
-    write_one_config("templates/cog_template.yaml", "cog.yaml", master_config['cog_yaml_parameters'])
-    write_one_config("templates/config_template.py", "config.py", master_config['config_py_parameters'])
+    #write_one_config("templates/cog_template.yaml", "cog.yaml", master_config['cog_yaml_parameters'])
+    write_one_config("templates/config_template.py", "cronfig.py", master_config['config_py_parameters'])
 
     
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument("--model_name", default="flan-t5-base", help="name of the flan-t5 model you want to configure cog for")
+    parser.add_argument("--model_name", default="llama-7b", help="name of the flan-t5 model you want to configure cog for")
     args = parser.parse_args()
 
     write_configs(args.model_name)

@@ -1,5 +1,7 @@
 flan-t5**
 checkpoints/**
-# modify pretrained_weights if you want to build weights into the image
-pretrained_weights/**
+examples/**
+weights_13/**
 tmp/**
+**.jsonl
+**.tensors
