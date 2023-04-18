@@ -163,6 +163,8 @@ def load_json(path):
 
 
 def load_model(model_name_or_path):
+    print(f"Rank : {os.environ['RANK']}, device: {torch.cuda.current_device()}")
+    torch.cuda.set_device(int(os.environ['RANK']))
     if model_name_or_path is None:
         model_name_or_path = DEFAULT_MODEL_NAME
     model = load_tensorizer(model_name_or_path, plaid_mode=False, cls=LlamaForCausalLM)
