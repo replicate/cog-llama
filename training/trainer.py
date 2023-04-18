@@ -175,13 +175,7 @@ def load_peft_model(
     if lora_target_modules:
         lora_target_modules = lora_target_modules.split(",")
     print("Using LoRA...")
-    if model_name_or_path is None:
-        model_name_or_path = DEFAULT_MODEL_NAME
-    model = LlamaForCausalLM.from_pretrained(
-        model_name_or_path,
-        cache_dir="pretrained_weights",
-        torch_dtype=torch.float16
-        )
+    model = load_model(model_name_or_path)
         
     config = LoraConfig(
         r=lora_rank,
@@ -294,7 +288,7 @@ def train(
     )
     trainer.train()
     print("model saving!")
-    model.save_pretrained("local_output_dir")
+    model.save_pretrained(local_output_dir)
     return
 
 

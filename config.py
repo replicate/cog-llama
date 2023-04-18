@@ -34,28 +34,37 @@ def load_tokenizer():
     )
     return tok
 
-
-def load_tensorizer(
-    weights, plaid_mode: bool = True, cls: LlamaForCausalLM = YieldingLlama
-):
-    st = time.time()
-    weights = str(weights)
+def pull_gcp_file(weights, local_filename):
+    """Pulls weights from GCP to local storage"""
     pattern = r'https://pbxt\.replicate\.delivery/([^/]+/[^/]+)'
     match = re.search(pattern, weights)
     if match:
         weights = f"gs://replicate-files/{match.group(1)}"
 
-
-    print(f"deserializing weights")
-    local_weights = "/src/llama_tensors"
     command = (
-        f"/gc/google-cloud-sdk/bin/gcloud storage cp {weights} {local_weights}".split()
+        f"/gc/google-cloud-sdk/bin/gcloud storage cp {weights} {local_filename}".split()
     )
     res = subprocess.run(command)
     if res.returncode != 0:
         raise Exception(
             f"gcloud storage cp command failed with return code {res.returncode}: {res.stderr.decode('utf-8')}"
         )
+    return
+
+
+
+def load_tensorizer(
+    weights, plaid_mode: bool = True, cls: LlamaForCausalLM = YieldingLlama
+):
+    st = time.time()
+    weights = str(weights)
+    local_weights = "/src/llama_tensors"
+    print("Deserializing weights...")
+    if 'http' in weights:
+        pull_gcp_file(weights, local_weights)
+    else:
+        local_weights = weights
+
     config = AutoConfig.from_pretrained(CONFIG_LOCATION)
 
     logging.disable(logging.WARN)

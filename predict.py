@@ -1,3 +1,4 @@
+import shutil
 import time
 from typing import Optional
 import zipfile
@@ -5,8 +6,10 @@ import zipfile
 import torch
 from cog import BasePredictor, ConcatenateIterator, Input, Path
 
-from config import DEFAULT_MODEL_NAME, load_tokenizer, load_tensorizer
+from config import DEFAULT_MODEL_NAME, load_tokenizer, load_tensorizer, pull_gcp_file
 from subclass import YieldingLlama
+from peft import PeftModel
+import os
 
 
 class Predictor(BasePredictor):
@@ -15,32 +18,39 @@ class Predictor(BasePredictor):
         if weights is not None and weights.name == "weights":
             # bugfix
             weights = None
+        weights = '/src/training_output.zip'
+
         if weights is None:
-            self.model = self.load_tensorizer(weights=DEFAULT_MODEL_NAME)
+            self.model = load_tensorizer(weights=DEFAULT_MODEL_NAME, plaid_mode=True, cls=YieldingLlama)
 
         weights = str(weights)
         if '.zip' in weights:
             self.model = self.load_peft(weights)
-        if "tensors" in weights:
-            self.model = self.load_tensorizer(weights)
+        elif "tensors" in weights:
+            self.model = load_tensorizer(weights, plaid_mode=True, cls=YieldingLlama)
         else:
             self.model = self.load_huggingface_model(weights=weights)
 
         self.tokenizer = load_tokenizer()
 
     def load_peft(self, weights):
+        st = time.time()
         if 'tensors' in DEFAULT_MODEL_NAME:
-            model = self.load_tensorizer(DEFAULT_MODEL_NAME)
+            model = load_tensorizer(DEFAULT_MODEL_NAME, plaid_mode=False, cls=YieldingLlama)
         else:
             model = self.load_huggingface_model(DEFAULT_MODEL_NAME)
         if 'https' in weights: # weights are in the cloud
-            # TODO: pull zip file locally
-            weights = 'local_file.zip'
-        out = 'peft_dir'
+            local_weights = 'local_weights.zip'
+            pull_gcp_file(weights, local_weights)
+            weights = local_weights
+        out = '/src/peft_dir'
+        if os.path.exists(out):
+            shutil.rmtree(out)
         with zipfile.ZipFile(weights, 'r') as zip_ref:
             zip_ref.extractall(out)
         model = PeftModel.from_pretrained(model, out)
-        return model
+        print(f"peft model loaded in {time.time() - st}")
+        return model.to('cuda')
 
     def load_huggingface_model(self, weights=None):
         st = time.time()
@@ -84,11 +94,11 @@ class Predictor(BasePredictor):
     ) -> ConcatenateIterator[str]:
         input = self.tokenizer(prompt, return_tensors="pt").input_ids.to(self.device)
 
-        with torch.inference_mode():
+        with torch.inference_mode() and torch.autocast("cuda"):
             first_token_yielded = False
             prev_ids = []
             for output in self.model.generate(
-                input,
+                input_ids=input,
                 max_length=max_length,
                 do_sample=True,
                 temperature=temperature,

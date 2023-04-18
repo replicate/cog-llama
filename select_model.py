@@ -7,11 +7,11 @@ from jinja2 import Template
 CONFIGS = {
     "llama-7b": {
         "cog_yaml_parameters": {"predictor":"predict.py:Predictor"},
-        "config_py_parameters": {"model_name": "weights/llama-7b"}
+        "config_py_parameters": {"model_name": "SET_ME", "config_location": "llama_weights/llama-7b"}
     },
     "llama-13b": {
         "cog_yaml_parameters": {"predictor":"predict.py:Predictor"},
-        "config_py_parameters": {"model_name": "weights/llama-7b"}
+        "config_py_parameters": {"model_name": "SET_ME", "config_location": "llama_weights/llama-13b"}
     },
 }
 
