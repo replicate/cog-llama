@@ -60,7 +60,7 @@ def load_tensorizer(
     weights = str(weights)
     local_weights = "/src/llama_tensors"
     print("Deserializing weights...")
-    if 'http' in weights:
+    if 'http' in weights or 'gs' in weights:
         pull_gcp_file(weights, local_weights)
     else:
         local_weights = weights
