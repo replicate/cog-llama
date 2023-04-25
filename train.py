@@ -75,7 +75,7 @@ def train(
     os.makedirs(output_dir)
 
     num_gpus = torch.cuda.device_count()
-    num_gpus_flag = f"--nproc_per_node={num_gpus}"
+    num_gpus_flag = f"--num_gpus={num_gpus}"
 
     print(f"Local Output Dir: {output_dir}")
     print(f"Number of GPUs: {num_gpus}")
@@ -90,10 +90,11 @@ def train(
         return " "
 
     res = call(
-        "torchrun "
+        "deepspeed "
         + num_gpus_flag
         + " --master_port=9292"
-        + " training/trainer.py"
+        + " --module training.trainer"
+        + f" --deepspeed {deepspeed_config}"
         + f" --train_data={str(train_data)}"
         + f" --weights={input_model}"
         + f" --num_train_epochs={num_train_epochs}"

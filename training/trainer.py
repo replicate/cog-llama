@@ -246,7 +246,8 @@ def train(
     lora_dropout: float = 0.1,
     lora_target_modules: Optional[Union[List[str], str]] = None, 
     local_output_dir: str = None,
-    local_rank: int = -1
+    local_rank: int = -1,
+    deepspeed: str = None
 ) -> None:
     print("Loading model...")
     model = load_peft_model(weights, lora_rank, lora_alpha, lora_dropout, lora_target_modules)
@@ -285,6 +286,8 @@ def train(
             tf32=True,
             fp16=True,
             half_precision_backend="cuda_amp",
+            deepspeed=deepspeed,
+            local_rank=local_rank
         ),
         data_collator=SequenceDataCollator(tokenizer, 8),  # depends on bf16 value
     )
@@ -316,6 +319,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--num_train_epochs", type=int, required=True, help="Number of training epochs"
+    )
+    parser.add_argument(
+        "--deepspeed", type=str, default=None, help="Path to deepspeed config file."
     )
     parser.add_argument(
         "--learning_rate",
