@@ -11,7 +11,7 @@ from cog import BaseModel, Input, Path
 from tensorizer import TensorSerializer
 from transformers import LlamaForCausalLM
 
-from config import DEFAULT_MODEL_NAME
+from config import DEFAULT_MODEL_NAME, pull_gcp_file
 
 MODEL_OUT = "/src/tuned_weights.tensors"
 CHECKPOINT_DIR = "checkpoints"
@@ -64,10 +64,16 @@ def train(
     lora_dropout: float = Input(description="Dropout for lora training", default=0.1, ge=0.0, le=1.0),
     lora_target_modules: str = Input(description="Comma-separated list of lora modules to target, i.e. 'q_proj,v_proj'. Leave blank for default.", default="q_proj,v_proj")
 ) -> TrainingOutput:
-    input_model = weights if weights is not None else DEFAULT_MODEL_NAME
+    input_weights = weights if weights is not None else DEFAULT_MODEL_NAME
+
+    if 'http' in input_weights or 'gs' in input_weights:
+        # doing this once instead of 4x
+        local_weights = '/src/llama.tensors'
+        pull_gcp_file(input_weights, local_weights)
+        input_weights = local_weights
 
     root_path = os.getcwd()
-    deepspeed_config = os.path.join(root_path, "ds_config/ds_z3_bf16_config.json")
+    deepspeed_config = os.path.join(root_path, "ds_config/ds_z3_fp16_config.json")
 
     output_dir = DIST_OUT_DIR
     if os.path.exists(output_dir):
@@ -96,7 +102,7 @@ def train(
         + " --module training.trainer"
         + f" --deepspeed {deepspeed_config}"
         + f" --train_data={str(train_data)}"
-        + f" --weights={input_model}"
+        + f" --weights={input_weights}"
         + f" --num_train_epochs={num_train_epochs}"
         + f" --max_steps={max_steps}"
         + _arg_if_present(eval_data, "eval_data")
