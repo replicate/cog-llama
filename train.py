@@ -34,7 +34,7 @@ def train(
     weights: Path = Input(
         description="location of weights that are going to be fine-tuned", default=None
     ),
-    train_batch_size: int = Input(description="batch size per GPU", default=4, ge=1),
+    train_batch_size: int = Input(description="batch size per GPU", default=1, ge=1),
     gradient_accumulation_steps: int = Input(
         description="number of training steps to update gradient for before performing a backward pass",
         default=8,
@@ -60,7 +60,7 @@ def train(
     ),
     lora_rank: int = Input(
         description="Rank of the lora matrices", default=8, ge=1),
-    lora_alpha: int = Input(description="Alpha parameter for scaling lora weights; weigts are scaled by alpha/rank", default=16, ge=1),
+    lora_alpha: int = Input(description="Alpha parameter for scaling lora weights; weights are scaled by alpha/rank", default=16, ge=1),
     lora_dropout: float = Input(description="Dropout for lora training", default=0.1, ge=0.0, le=1.0),
     lora_target_modules: str = Input(description="Comma-separated list of lora modules to target, i.e. 'q_proj,v_proj'. Leave blank for default.", default="q_proj,v_proj")
 ) -> TrainingOutput:
