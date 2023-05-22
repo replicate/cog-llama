@@ -155,10 +155,10 @@ def load_json(path):
     return data
 
 
-def load_model(model_name_or_path):
+def load_model(model_name_or_path, gradient_checkpointing: bool = False):
     if model_name_or_path is None:
         model_name_or_path = DEFAULT_MODEL_NAME
-    model = load_tensorizer(model_name_or_path, plaid_mode=False, cls=LlamaForCausalLM)
+    model = load_tensorizer(model_name_or_path, plaid_mode=False, cls=LlamaForCausalLM, gradient_checkpointing=gradient_checkpointing)
     return model
 
 
@@ -238,13 +238,14 @@ def train(
     local_output_dir: str = None,
     deepspeed: str = None,
     local_rank: int = -1,
+    gradient_checkpointing: bool = True,
 ) -> None:
     print("Loading model...")
 
     # if peft:
     #     print("training lora!")
     #     model = load_peft_model(weights, lora_rank, lora_alpha, lora_dropout)
-    model = load_model(weights)
+    model = load_model(weights, gradient_checkpointing=gradient_checkpointing)
     tokenizer = load_tokenizer()
 
     print(f"Loading dataset {train_data}...")
@@ -279,6 +280,7 @@ def train(
             bf16=True,
             half_precision_backend="cuda_amp",
             local_rank=local_rank,
+            gradient_checkpointing=gradient_checkpointing,
         ),
         data_collator=SequenceDataCollator(tokenizer, 8),  # depends on bf16 value
     )
@@ -357,6 +359,11 @@ if __name__ == "__main__":
         type=int,
         default=-1,
         help="Provided by deepspeed to identify which instance this process is when performing multi-GPU training.",
+    )
+    parser.add_argument(
+        "--gradient_checkpointing",
+        action="store_true",
+        help="Whether to use gradient checkpointing to save memory at the cost of speed.",
     )
     some_args = parser.parse_args()
     train(**vars(some_args))

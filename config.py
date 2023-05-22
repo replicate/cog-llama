@@ -36,7 +36,7 @@ def load_tokenizer():
 
 
 def load_tensorizer(
-    weights, plaid_mode: bool = True, cls: LlamaForCausalLM = YieldingLlama
+    weights, plaid_mode: bool = True, cls: LlamaForCausalLM = YieldingLlama, gradient_checkpointing: bool = False
 ):
     st = time.time()
     weights = str(weights)
@@ -61,7 +61,7 @@ def load_tensorizer(
     logging.disable(logging.WARN)
     model = no_init_or_tensor(
         lambda: cls.from_pretrained(
-            None, config=config, state_dict=OrderedDict(), torch_dtype=torch.float16
+            None, config=config, state_dict=OrderedDict(), torch_dtype=torch.float16, gradient_checkpointing=gradient_checkpointing,
         )
     )
     logging.disable(logging.NOTSET)
