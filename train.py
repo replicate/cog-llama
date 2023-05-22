@@ -8,7 +8,7 @@ from cog import BaseModel, Input, Path
 from tensorizer import TensorSerializer
 from transformers import LlamaForCausalLM
 
-from config import DEFAULT_MODEL_NAME
+from config import DEFAULT_MODEL_NAME, maybe_download
 
 MODEL_OUT = "/src/tuned_weights.tensors"
 CHECKPOINT_DIR = "checkpoints"
@@ -57,6 +57,8 @@ def train(
     ),
 ) -> TrainingOutput:
     input_model = weights if weights is not None else DEFAULT_MODEL_NAME
+    # 1xing download here so we don't download per process in `trainer.py`
+    maybe_download(path=DEFAULT_MODEL_NAME)
 
     root_path = os.getcwd()
     deepspeed_config = os.path.join(root_path, "ds_config/ds_z3_bf16_config.json")

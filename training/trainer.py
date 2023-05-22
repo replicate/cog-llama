@@ -1,6 +1,7 @@
 import argparse
 import copy
 import json
+import os
 
 import torch
 from cog import Input, Path
@@ -155,10 +156,10 @@ def load_json(path):
     return data
 
 
-def load_model(model_name_or_path, gradient_checkpointing: bool = False):
+def load_model(model_name_or_path):
     if model_name_or_path is None:
         model_name_or_path = DEFAULT_MODEL_NAME
-    model = load_tensorizer(model_name_or_path, plaid_mode=False, cls=LlamaForCausalLM, gradient_checkpointing=gradient_checkpointing)
+    model = load_tensorizer(model_name_or_path, plaid_mode=False, cls=LlamaForCausalLM)
     return model
 
 
@@ -240,12 +241,12 @@ def train(
     local_rank: int = -1,
     gradient_checkpointing: bool = True,
 ) -> None:
+    # issue w/multi-gpu loading in tensorizer
+    torch.cuda.set_device(int(os.environ['RANK']))
+
     print("Loading model...")
 
-    # if peft:
-    #     print("training lora!")
-    #     model = load_peft_model(weights, lora_rank, lora_alpha, lora_dropout)
-    model = load_model(weights, gradient_checkpointing=gradient_checkpointing)
+    model = load_model(weights)
     tokenizer = load_tokenizer()
 
     print(f"Loading dataset {train_data}...")
