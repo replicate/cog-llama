@@ -198,12 +198,13 @@ class YieldingLlama(LlamaForCausalLM):
                 model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
                 # forward pass to get next token
-                outputs = self(
-                    **model_inputs,
-                    return_dict=True,
-                    output_attentions=output_attentions,
-                    output_hidden_states=output_hidden_states,
-                )
+                with torch.inference_mode():
+                    outputs = self(
+                        **model_inputs,
+                        return_dict=True,
+                        output_attentions=output_attentions,
+                        output_hidden_states=output_hidden_states,
+                    )
 
                 if synced_gpus and this_peer_finished:
                     continue  # don't waste resources running the code we don't need
