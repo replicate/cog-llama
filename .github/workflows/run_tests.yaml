@@ -1,0 +1,33 @@
+name: run_tests
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: [self-hosted, gpu-a100]
+    strategy: 
+      matrix:
+        model: ['llama-7b']
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v3
+        with:
+          python-version: 3.8
+
+      - name: Install Python dependencies
+        run: pip install pytest
+
+      - name: Install Cog
+        run: |
+          sudo curl -o /usr/local/bin/cog -L https://github.com/replicate/cog/releases/latest/download/cog_`uname -s`_`uname -m`
+          sudo chmod +x /usr/local/bin/cog
+
+      - name: Select model
+        run: 
+          cog run python select_model.py --model_name ${{ matrix.model }} --model_path ${{ secrets.LLAMA_7B_PATH }}
+
+      - name: Run tests
+        run: pytest -vv test/
