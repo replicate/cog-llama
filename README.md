@@ -1,19 +1,20 @@
 # LLaMA Cog template 🦙
 
-LLaMA is a [new open-source language model from Meta Research](https://ai.facebook.com/blog/large-language-model-llama-meta-ai/) that performs as well as closed-source models. 
+[Vicuna-13B](https://lmsys.org/blog/2023-03-30-vicuna/) is an open source chatbot based on LLaMA-13B. It was developed by training LLaMA-13B on user-shared conversations collected from [ShareGPT](https://sharegpt.com/). LLaMA is a [new open-source language model from Meta Research](https://ai.facebook.com/blog/large-language-model-llama-meta-ai/) that performs as well as comparable closed-source models. Using GPT-4 to evaluate model outputs, the developers of Vicuna-13B found that it not only outperforms comparable models like Stanford Alpaca, but also reaches 90% of the quality of OpenAI's ChatGPT and Google Bard.
 
-Similar to Stable Diffusion, this has created a wealth of experiments and innovation. [As Simon Willison articulated](https://simonwillison.net/2023/Mar/11/llama/), it's easy to run on your own hardware, large enough to be useful, and open-source enough to be tinkered with.
+This is a guide to running Vicuna-13B in the cloud using Replicate. You'll use the [Cog](https://github.com/replicate/cog) command-line tool to package the model and push it to Replicate as a web interface and API.
 
-This is a guide to running LLaMA using in the cloud using Replicate. You'll use the [Cog](https://github.com/replicate/cog) command-line tool to package the model and push it to Replicate as a web interface and API.
+This model can be used to run the `13B` version of Vicuna and it also works with fine-tuned versions.
 
-This model can be used to run the `7B` version of LLaMA and it also works with fine-tuned models.
-
-**Note: LLaMA is for research purposes only. It is not intended for commercial use.**
+**Note: Vicuna is for research purposes only. It is not intended for commercial use.**
 
 ## Prerequisites
 
-- **LLaMA weights**. The weights for LLaMA have not yet been released publicly. To apply for access, fill out [this Meta Research form](https://docs.google.com/forms/d/e/1FAIpQLSfqNECQnMkycAp2jP4Z9TFX0cGR4uf7b_fBxjY_OjhJILlKGA/viewform).
-- **GPU machine**. You'll need a Linux machine with an NVIDIA GPU attached and the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#docker) installed. If you don't already have access to a machine with a GPU, check out our [guide to getting a GPU machine](https://replicate.com/docs/guides/get-a-gpu-machine).
+- **LLaMA weights**. The weights for LLaMA 13B have not yet been released publicly. To apply for access, fill out [this Meta Research form](https://docs.google.com/forms/d/e/1FAIpQLSfqNECQnMkycAp2jP4Z9TFX0cGR4uf7b_fBxjY_OjhJILlKGA/viewform).
+
+- **GPU machine**. You'll need a Linux machine with an NVIDIA GPU attached and the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html#docker) installed. If you don't already have access to a machine with a GPU, check out our [guide to getting a 
+GPU machine](https://replicate.com/docs/guides/get-a-gpu-machine).
+
 - **Docker**. You'll be using the [Cog](https://github.com/replicate/cog) command-line tool to build and push a model. Cog uses Docker to create containers for models.
 
 ## Step 0: Install Cog
@@ -27,41 +28,30 @@ sudo chmod +x /usr/local/bin/cog
 
 ## Step 1: Set up weights
 
-Replicate currently supports the `7B` model size.
+Vicuna-13B's weights are relased as delta weights in order to comply with the LLaMA model license. To obtain the Vicuna-13B weights, you can apply the Viuna-13B weights to the original LLaMA weights [see here](https://github.com/lm-sys/FastChat#vicuna-weights). 
 
-Put your downloaded weights in a folder called `unconverted-weights`. The folder hierarchy should look something like this: 
+After obtaining the original LLaMA weights, you need to convert them to Hugging Face format (see [here](https://huggingface.co/docs/transformers/main/model_doc/llama). 
 
-```
-unconverted-weights
-├── 7B
-│   ├── checklist.chk
-│   ├── consolidated.00.pth
-│   └── params.json
-├── tokenizer.model
-└── tokenizer_checklist.chk
-```
+Then you can run the following script to apply the delta weights (see [here](https://github.com/lm-sys/FastChat#vicuna-weights) for more details). 
 
-Convert the weights from a PyTorch checkpoint to a transformers-compatible format using the this command:
+The following command expects your Hugging Face format LLaMA weights and tokenizer to be in this directory: `./models/llama-13b/hf/`
 
 ```
-cog run python -m transformers.models.llama.convert_llama_weights_to_hf --input_dir unconverted-weights --model_size 7B --output_dir weights
+cog run python scripts/apply_delta.py --base models/llama-13b/hf --target models/vicuna-13b/hf --delta lmsys/vicuna-13b-delta-v1.1
 ```
 
-You final directory structure should look like this:
+Next, you should copy the tokenizer and model config to a separate directory so they can be copied to your image.
 
 ```
-weights
-├── config.json
-├── generation_config.json
-├── pytorch_model-00001-of-00002.bin
-├── pytorch_model-00002-of-00002.bin
-├── pytorch_model.bin.index.json
-├── special_tokens_map.json
-├── tokenizer.model
-└── tokenizer_config.json
+cp models/vicuna-13b/hf/config.json models/vicuna-13b/hf/tokenizer_config.json models/vicuna-13b/hf/special_tokens_map.json models/vicuna-13b/hf/tokenizer.model models/vicuna-13b
 ```
 
-Once you've done this, you should uncomment `unconverted-weights` in your `.dockerignore` file. This ensures that `unconverted-weights` aren't built into the resulting cog image.
+Finally, we recommend converting your weights to Tensorizer format, which will dramatically improve read efficiency when you load them. 
+
+```
+cog run python scripts/tensorize_model.py --model_name vicuna-13b --model_path models/vicuna-13b/hf --tensorizer_path models/vicuna-13b/tensorized/vicuna-13b-16fp.tensors --dtype fp16
+```
+
 
 ## Step 2: Run the model
 
