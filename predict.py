@@ -18,17 +18,15 @@ class Predictor(BasePredictor):
         if weights is not None and weights.name == "weights":
             # bugfix
             weights = None
+        
+        weights = DEFAULT_MODEL_NAME if weights is None else str(weights)
 
-        if weights is None:
-            self.model = load_tensorizer(weights=DEFAULT_MODEL_NAME, plaid_mode=True, cls=YieldingLlama)
+        if '.zip' in weights:
+            self.model = self.load_peft(weights)
+        elif "tensors" in weights:
+            self.model = load_tensorizer(weights, plaid_mode=True, cls=YieldingLlama)
         else:
-            weights = str(weights)
-            if '.zip' in weights:
-                self.model = self.load_peft(weights)
-            elif "tensors" in weights:
-                self.model = load_tensorizer(weights, plaid_mode=True, cls=YieldingLlama)
-            else:
-                self.model = self.load_huggingface_model(weights=weights)
+            self.model = self.load_huggingface_model(weights=weights)
 
         self.tokenizer = load_tokenizer()
 
