@@ -81,10 +81,13 @@ def load_tensorizer(
     des.load_into_module(model)
     print(f"weights loaded in {time.time() - st}")
     
+    # We don't know what device model was tensorized in or what dtype was used.
+    # If a GPU is available, we need to ensure that the model is on the GPU and cast to fp16.
     if next(model.parameters()).is_cuda:
-        # Model is already on GPU
-        return model
+        model = model.half()
     else:
         if torch.cuda.is_available():
-            return model.to("cuda")
+            model.to("cuda")
+            model = model.half()
+
     return model
