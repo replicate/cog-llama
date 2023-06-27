@@ -11,7 +11,9 @@ from tensorizer.utils import no_init_or_tensor
 
 from subclass import YieldingLlama
 
-DEFAULT_MODEL_NAME = "llama_weights/llama-7b"  # path from which we pull weights when there's no COG_WEIGHTS environment variable
+# path from which we pull weights when there's no COG_WEIGHTS environment variable
+# If you want to use tensorized weights, set `DEFAULT_MODEL_NAME` to the path of the tensorized weights.
+DEFAULT_MODEL_NAME = "llama_weights/llama-7b"  
 TOKENIZER_NAME = "llama_weights/tokenizer"
 CONFIG_LOCATION = "llama_weights/llama-7b"
 
@@ -78,4 +80,11 @@ def load_tensorizer(
     des = TensorDeserializer(local_weights, plaid_mode=plaid_mode)
     des.load_into_module(model)
     print(f"weights loaded in {time.time() - st}")
+    
+    if next(model.parameters()).is_cuda:
+        # Model is already on GPU
+        return model
+    else:
+        if torch.cuda.is_available():
+            return model.to("cuda")
     return model
